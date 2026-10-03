@@ -1,4 +1,4 @@
-"""VoltSync dashboard: a 24-hour store / use / sell dispatch."""
+"""VoltSync dashboard: dispatcher, seller, and buyer on one simulated day."""
 
 from __future__ import annotations
 
@@ -10,22 +10,18 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
-from plotly.subplots import make_subplots
 
 DEFAULT_API_URL = os.environ.get("VOLTSYNC_API_URL", "http://localhost:8000")
 
-DECISION_COLOR = {
-    "store": "#2ee6a6",
-    "use": "#7aa2ff",
-    "sell": "#f5c542",
-    "idle": "#5c6b82",
-}
-DECISION_LABEL = {
-    "store": "Store",
-    "use": "Use",
-    "sell": "Sell",
-    "idle": "Idle",
-}
+AMBER = "#f5c542"
+EMERALD = "#2ee6a6"
+INDIGO = "#6366f1"
+GRID = "#c5d4e8"
+
+SALES_HOUR = "Час суток (00:00–23:00)"
+SALES_VOLUME = "Объем сброса (кВт·ч)"
+SALES_PRICE = "Цена продажи (AMD/кВт·ч)"
+SALES_REVENUE = "Начислено за час (AMD)"
 
 st.set_page_config(
     page_title="VoltSync VPP",
@@ -39,14 +35,12 @@ st.markdown(
     <style>
       .stApp {
         background:
-          radial-gradient(1100px 520px at 8% -10%, rgba(46, 230, 166, 0.16), transparent 55%),
-          radial-gradient(900px 480px at 100% 0%, rgba(122, 162, 255, 0.14), transparent 50%),
+          radial-gradient(1100px 520px at 8% -10%, rgba(245, 197, 66, 0.12), transparent 55%),
+          radial-gradient(900px 480px at 100% 0%, rgba(99, 102, 241, 0.16), transparent 50%),
           #0b1220;
         color: #e7eef8;
       }
-      header[data-testid="stHeader"] {
-        background: transparent;
-      }
+      header[data-testid="stHeader"] { background: transparent; }
       [data-testid="stSidebar"] {
         background: #10192b;
         border-right: 1px solid rgba(255, 255, 255, 0.06);
@@ -57,9 +51,18 @@ st.markdown(
         border-radius: 14px;
         padding: 14px 16px 10px 16px;
       }
-      .vs-hero {
-        padding: 8px 2px 0 2px;
+      .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+      .stTabs [data-baseweb="tab"] {
+        background: #121a2b;
+        border-radius: 12px 12px 0 0;
+        color: #9aadc4;
+        padding: 10px 16px;
       }
+      .stTabs [aria-selected="true"] {
+        color: #f4f8ff;
+        border-bottom: 2px solid #2ee6a6;
+      }
+      .vs-hero { padding: 4px 2px 8px 2px; }
       .vs-kicker {
         letter-spacing: 0.16em;
         text-transform: uppercase;
@@ -69,38 +72,14 @@ st.markdown(
         margin-bottom: 6px;
       }
       .vs-title {
-        font-size: 2.1rem;
+        font-size: 2.05rem;
         line-height: 1.1;
         font-weight: 720;
         margin: 0;
         color: #f4f8ff;
       }
-      .vs-sub {
-        color: #9aadc4;
-        margin-top: 6px;
-        font-size: 1.02rem;
-      }
-      .vs-summary {
-        background: linear-gradient(180deg, rgba(18, 32, 48, 0.95), rgba(14, 22, 38, 0.95));
-        border: 1px solid rgba(46, 230, 166, 0.28);
-        border-radius: 16px;
-        padding: 16px 18px;
-        color: #d7e6f5;
-        line-height: 1.45;
-        margin: 8px 0 16px 0;
-      }
-      .vs-block {
-        border-radius: 12px;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-        background: #121a2b;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-      .vs-block b { color: #f4f8ff; }
-      .vs-note {
-        color: #8ea0b8;
-        font-size: 0.86rem;
-      }
+      .vs-sub { color: #9aadc4; margin-top: 6px; font-size: 1.02rem; }
+      .vs-note { color: #8ea0b8; font-size: 0.86rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -111,11 +90,18 @@ class ApiError(Exception):
     """The VoltSync API could not return a plan."""
 
 
+def _init_role_flags() -> None:
+    if "demand_response_active" not in st.session_state:
+        st.session_state.demand_response_active = False
+    if "peak_shaving_active" not in st.session_state:
+        st.session_state.peak_shaving_active = False
+
+
 def api_get(base_url: str, path: str) -> Any:
     try:
         response = requests.get(f"{base_url.rstrip('/')}{path}", timeout=20)
-    except requests.RequestException as exc:
-        raise ApiError(f"Cannot reach the API at {base_url}. {exc}") from exc
+    except requests.exceptions.RequestException as exc:
+        raise ApiError(f"Нет связи с API по адресу {base_url}. {exc}") from exc
     if response.status_code >= 400:
         raise ApiError(_error_text(response))
     return response.json()
@@ -124,8 +110,8 @@ def api_get(base_url: str, path: str) -> Any:
 def api_post(base_url: str, path: str, payload: dict[str, Any]) -> Any:
     try:
         response = requests.post(f"{base_url.rstrip('/')}{path}", json=payload, timeout=30)
-    except requests.RequestException as exc:
-        raise ApiError(f"Cannot reach the API at {base_url}. {exc}") from exc
+    except requests.exceptions.RequestException as exc:
+        raise ApiError(f"Нет связи с API по адресу {base_url}. {exc}") from exc
     if response.status_code >= 400:
         raise ApiError(_error_text(response))
     return response.json()
@@ -135,13 +121,14 @@ def _error_text(response: requests.Response) -> str:
     try:
         body = response.json()
     except ValueError:
-        return f"API returned HTTP {response.status_code}."
+        return f"API вернул HTTP {response.status_code}."
     detail = body.get("detail", body)
-    return f"API returned HTTP {response.status_code}: {detail}"
+    return f"API вернул HTTP {response.status_code}: {detail}"
 
 
 def _layout(fig: go.Figure, height: int) -> go.Figure:
     fig.update_layout(
+        template="plotly_dark",
         height=height,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(16, 25, 43, 0.72)",
@@ -153,204 +140,286 @@ def _layout(fig: go.Figure, height: int) -> go.Figure:
             "x": 0,
             "bgcolor": "rgba(0,0,0,0)",
         },
-        margin={"l": 52, "r": 48, "t": 48, "b": 42},
+        margin={"l": 56, "r": 28, "t": 48, "b": 42},
         hovermode="x unified",
     )
     fig.update_xaxes(gridcolor="rgba(255,255,255,0.06)", zeroline=False, showline=False)
-    fig.update_yaxes(gridcolor="rgba(255,255,255,0.06)", zeroline=False, showline=False)
+    fig.update_yaxes(gridcolor="rgba(255,255,255,0.06)", zerolinecolor="rgba(255,255,255,0.18)")
     return fig
 
 
-def chart_decisions(hours: list[dict[str, Any]]) -> go.Figure:
-    fig = go.Figure(
-        go.Bar(
-            x=[row["label"] for row in hours],
-            y=[1] * len(hours),
-            marker_color=[DECISION_COLOR[row["decision"]] for row in hours],
-            text=[DECISION_LABEL[row["decision"]] for row in hours],
-            textposition="inside",
-            hovertext=[row["reason"] for row in hours],
-            hoverinfo="text",
-            name="Decision",
-        )
+def _mark_demand_response(fig: go.Figure, active: bool) -> None:
+    if not active:
+        return
+    fig.add_vrect(
+        x0="18:00",
+        x1="20:00",
+        fillcolor="rgba(99, 102, 241, 0.14)",
+        line_width=0,
+        annotation_text="DR −40%",
+        annotation_position="top left",
+        annotation_font_color="#c7d2fe",
     )
-    fig.update_yaxes(visible=False, range=[0, 1])
-    fig.update_layout(bargap=0.18, showlegend=False)
-    return _layout(fig, 168)
 
 
-def chart_energy(hours: list[dict[str, Any]]) -> go.Figure:
+def chart_balance(hours: list[dict[str, Any]], demand_response: bool) -> go.Figure:
     labels = [row["label"] for row in hours]
+    battery = [
+        (row["battery_to_load_kwh"] + row["battery_to_grid_kwh"]) - row["charge_kwh"] for row in hours
+    ]
+    grid = [
+        (row["grid_to_load_kwh"] + row["grid_to_battery_kwh"])
+        - (row["pv_to_grid_kwh"] + row["battery_to_grid_kwh"])
+        for row in hours
+    ]
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
             x=labels,
             y=[row["solar_kwh"] for row in hours],
-            name="Solar",
+            name="Солнце",
             mode="lines",
-            line={"color": "#f5c542", "width": 2.5},
+            line={"color": AMBER, "width": 2.6},
             fill="tozeroy",
-            fillcolor="rgba(245, 197, 66, 0.18)",
+            fillcolor="rgba(245, 197, 66, 0.16)",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            x=labels,
+            y=battery,
+            name="Батарея",
+            marker_color=EMERALD,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=labels,
+            y=grid,
+            name="Сеть",
+            mode="lines",
+            line={"color": GRID, "width": 2.2, "dash": "dot"},
         )
     )
     fig.add_trace(
         go.Scatter(
             x=labels,
             y=[row["load_kwh"] for row in hours],
-            name="Load",
+            name="Нагрузка",
             mode="lines",
-            line={"color": "#7aa2ff", "width": 2.5},
+            line={"color": INDIGO, "width": 2.6},
         )
     )
-    fig.add_trace(
-        go.Bar(
-            x=labels,
-            y=[row["charge_kwh"] for row in hours],
-            name="Charge",
-            marker_color="rgba(46, 230, 166, 0.85)",
-        )
-    )
-    fig.add_trace(
-        go.Bar(
-            x=labels,
-            y=[-row["discharge_kwh"] for row in hours],
-            name="Discharge",
-            marker_color="rgba(255, 139, 123, 0.9)",
-        )
-    )
-    fig.update_layout(barmode="relative")
-    fig.update_yaxes(title_text="kWh in the hour")
-    return _layout(fig, 420)
+    fig.update_layout(barmode="overlay")
+    fig.update_yaxes(title_text="кВт·ч за час")
+    _mark_demand_response(fig, demand_response)
+    return _layout(fig, 440)
 
 
-def chart_soc_prices(hours: list[dict[str, Any]], battery: dict[str, Any]) -> go.Figure:
-    labels = ["start"] + [row["label"] for row in hours]
-    soc = [round(battery["soc_initial"] * 100.0, 2)] + [row["soc_pct"] for row in hours]
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(
-        go.Scatter(
-            x=labels,
-            y=soc,
-            name="State of charge",
-            mode="lines",
-            line={"color": "#c9a6ff", "width": 3, "shape": "hv"},
-        ),
-        secondary_y=False,
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[row["label"] for row in hours],
-            y=[row["buy_price_amd"] for row in hours],
-            name="Buy price",
-            mode="lines",
-            line={"color": "#ff8b7b", "width": 2, "dash": "dot"},
-        ),
-        secondary_y=True,
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[row["label"] for row in hours],
-            y=[row["sell_price_amd"] for row in hours],
-            name="Sell price",
-            mode="lines",
-            line={"color": "#2ee6a6", "width": 2, "dash": "dot"},
-        ),
-        secondary_y=True,
-    )
-    fig.add_hline(
-        y=battery["soc_min"] * 100.0,
-        line_dash="dash",
-        line_color="rgba(255,255,255,0.25)",
-        annotation_text="SOC min",
-        annotation_font_color="#8ea0b8",
-    )
-    fig.add_hline(
-        y=battery["soc_max"] * 100.0,
-        line_dash="dash",
-        line_color="rgba(255,255,255,0.25)",
-        annotation_text="SOC max",
-        annotation_font_color="#8ea0b8",
-    )
-    fig.update_yaxes(title_text="State of charge %", secondary_y=False, range=[0, 100])
-    fig.update_yaxes(title_text="AMD / kWh", secondary_y=True)
-    return _layout(fig, 420)
-
-
-def chart_grid(hours: list[dict[str, Any]]) -> go.Figure:
+def chart_spot_prices(hours: list[dict[str, Any]], demand_response: bool) -> go.Figure:
     labels = [row["label"] for row in hours]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=labels,
+            y=[row["sell_price_amd"] for row in hours],
+            name="Оптовая спотовая цена",
+            mode="lines",
+            line={"color": AMBER, "width": 2.8},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=labels,
+            y=[row["buy_price_amd"] for row in hours],
+            name="Розничный тариф",
+            mode="lines",
+            line={"color": INDIGO, "width": 2, "dash": "dot"},
+        )
+    )
+    arb_x: list[str] = []
+    arb_y: list[float] = []
+    arb_text: list[str] = []
+    for row in hours:
+        if row["decision"] == "store":
+            arb_x.append(row["label"])
+            arb_y.append(row["buy_price_amd"])
+            arb_text.append("Арбитраж: заряд")
+        elif row["decision"] == "sell":
+            arb_x.append(row["label"])
+            arb_y.append(row["sell_price_amd"])
+            arb_text.append("Арбитраж: продажа")
+    fig.add_trace(
+        go.Scatter(
+            x=arb_x,
+            y=arb_y,
+            name="Точки активации арбитража",
+            mode="markers",
+            marker={
+                "size": 12,
+                "color": EMERALD,
+                "symbol": "diamond",
+                "line": {"width": 1, "color": "#f4f8ff"},
+            },
+            text=arb_text,
+            hovertemplate="%{text}<br>%{x}: %{y:.0f} AMD/кВт·ч<extra></extra>",
+        )
+    )
+    fig.add_hline(
+        y=50,
+        line_dash="dash",
+        line_color="rgba(245, 197, 66, 0.55)",
+        annotation_text="Порог пик-шейвинга 50 AMD",
+        annotation_position="top left",
+        annotation_font_color=AMBER,
+    )
+    fig.update_yaxes(title_text="AMD / кВт·ч")
+    _mark_demand_response(fig, demand_response)
+    return _layout(fig, 420)
+
+
+def chart_soc(hours: list[dict[str, Any]], battery: dict[str, Any], demand_response: bool) -> go.Figure:
+    labels = [row["label"] for row in hours]
+    start_kwh = float(battery["soc_initial"]) * float(battery["capacity_kwh"])
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=["старт", *labels],
+            y=[round(start_kwh, 3), *[row["soc_kwh"] for row in hours]],
+            name="Заряд накопителя",
+            mode="lines",
+            line={"color": EMERALD, "width": 3, "shape": "hv"},
+            fill="tozeroy",
+            fillcolor="rgba(46, 230, 166, 0.14)",
+        )
+    )
+    usable_min = float(battery["soc_min"]) * float(battery["capacity_kwh"])
+    usable_max = float(battery["soc_max"]) * float(battery["capacity_kwh"])
+    fig.add_hrect(
+        y0=usable_min,
+        y1=usable_max,
+        fillcolor="rgba(46, 230, 166, 0.05)",
+        line_width=0,
+    )
+    fig.update_yaxes(title_text="кВт·ч")
+    _mark_demand_response(fig, demand_response)
+    return _layout(fig, 380)
+
+
+def chart_cumulative_revenue(sales: list[dict[str, Any]]) -> go.Figure:
+    labels = [f"{int(row['hour']):02d}:00" for row in sales]
+    running = 0.0
+    cumulative: list[float] = []
+    for row in sales:
+        running += float(row["revenue_amd"])
+        cumulative.append(round(running, 2))
+    peak = max(cumulative) if cumulative else 0.0
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=labels,
+            y=cumulative,
+            name="Накопленный доход",
+            mode="lines+markers",
+            line={"color": EMERALD, "width": 3},
+            marker={"size": 6, "color": EMERALD},
+            fill="tozeroy",
+            fillcolor="rgba(46, 230, 166, 0.14)",
+        )
+    )
+    if peak > 0 and cumulative:
+        last = labels[-1]
+        fig.add_trace(
+            go.Scatter(
+                x=[last],
+                y=[cumulative[-1]],
+                name="Итог суток",
+                mode="markers",
+                marker={"size": 14, "color": AMBER, "symbol": "diamond"},
+            )
+        )
+    fig.update_yaxes(title_text="AMD")
+    return _layout(fig, 400)
+
+
+def chart_buyer_costs(costs: list[dict[str, Any]], demand_response: bool) -> go.Figure:
+    labels = [f"{int(row['hour']):02d}:00" for row in costs]
     fig = go.Figure()
     fig.add_trace(
         go.Bar(
             x=labels,
-            y=[row["baseline_import_kwh"] for row in hours],
-            name="Import, no battery",
-            marker_color="rgba(255, 139, 123, 0.45)",
+            y=[row["baseline_cost_amd"] for row in costs],
+            name="До VoltSync",
+            marker_color=INDIGO,
         )
     )
     fig.add_trace(
         go.Bar(
             x=labels,
-            y=[row["grid_to_load_kwh"] + row["grid_to_battery_kwh"] for row in hours],
-            name="Import, VoltSync",
-            marker_color="#ff8b7b",
-        )
-    )
-    fig.add_trace(
-        go.Bar(
-            x=labels,
-            y=[-row["baseline_export_kwh"] for row in hours],
-            name="Export, no battery",
-            marker_color="rgba(46, 230, 166, 0.35)",
-        )
-    )
-    fig.add_trace(
-        go.Bar(
-            x=labels,
-            y=[-(row["pv_to_grid_kwh"] + row["battery_to_grid_kwh"]) for row in hours],
-            name="Export, VoltSync",
-            marker_color="#2ee6a6",
+            y=[row["optimized_cost_amd"] for row in costs],
+            name="После VoltSync",
+            marker_color=EMERALD,
         )
     )
     fig.update_layout(barmode="group")
-    fig.update_yaxes(title_text="kWh  ·  import up, export down")
-    return _layout(fig, 400)
+    fig.update_yaxes(title_text="AMD за час")
+    _mark_demand_response(fig, demand_response)
+    return _layout(fig, 440)
 
 
-def schedule_frame(hours: list[dict[str, Any]]) -> pd.DataFrame:
-    rows = []
-    for row in hours:
-        rows.append(
+def sales_frame(sales: list[dict[str, Any]]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
             {
-                "Hour": row["label"],
-                "Decision": DECISION_LABEL[row["decision"]],
-                "Why": row["reason"],
-                "Solar kWh": row["solar_kwh"],
-                "Load kWh": row["load_kwh"],
-                "Buy AMD": row["buy_price_amd"],
-                "Sell AMD": row["sell_price_amd"],
-                "Charge kWh": row["charge_kwh"],
-                "Discharge kWh": row["discharge_kwh"],
-                "SOC %": row["soc_pct"],
-                "Grid import kWh": round(row["grid_to_load_kwh"] + row["grid_to_battery_kwh"], 3),
-                "Grid export kWh": round(row["pv_to_grid_kwh"] + row["battery_to_grid_kwh"], 3),
-                "Net cost AMD": row["net_cost_amd"],
+                SALES_HOUR: f"{int(row['hour']):02d}:00",
+                SALES_VOLUME: row["volume_kwh"],
+                SALES_PRICE: row["price_amd"],
+                SALES_REVENUE: row["revenue_amd"],
             }
-        )
-    return pd.DataFrame(rows)
+            for row in sales
+        ]
+    )
 
 
-def paint_decision(frame: pd.DataFrame) -> pd.io.formats.style.Styler:
-    colors = {
-        "Store": "background-color: #123f36; color: #d8fff3",
-        "Use": "background-color: #1a2d52; color: #e4ecff",
-        "Sell": "background-color: #433812; color: #fff3c4",
-        "Idle": "background-color: #243044; color: #d5e2f2",
+def paint_sales(frame: pd.DataFrame) -> pd.io.formats.style.Styler:
+    peak = float(frame[SALES_REVENUE].max()) if not frame.empty else 0.0
+
+    def _row(row: pd.Series) -> list[str]:
+        if peak > 0 and abs(float(row[SALES_REVENUE]) - peak) < 0.011:
+            return ["background-color: #14532d; color: #ecfdf5; font-weight: 650"] * len(row)
+        return [""] * len(row)
+
+    return frame.style.apply(_row, axis=1).format(
+        {
+            SALES_VOLUME: "{:.2f}",
+            SALES_PRICE: "{:.0f}",
+            SALES_REVENUE: "{:,.0f}",
+        }
+    )
+
+
+def dispatcher_view(plan: dict[str, Any]) -> dict[str, float | str]:
+    hours = plan["hours"]
+    kpis = plan["kpis"]
+    pool_power_kw = float(plan["site"]["pv_capacity_kwp"]) + float(plan["battery"]["max_discharge_kw"])
+    green_saved_kwh = sum(float(row["pv_to_battery_kwh"]) for row in hours)
+    overload_kw = max(0.0, float(kpis["baseline_max_grid_import_kw"]) - float(kpis["max_grid_import_kw"]))
+    avoided_import_kwh = max(0.0, float(kpis["baseline_import_kwh"]) - float(kpis["grid_import_kwh"]))
+    if overload_kw >= 0.05 or float(kpis["self_sufficiency_pct"]) >= 70.0:
+        status = "Сбалансировано"
+    else:
+        status = "Опора на сеть"
+    if plan.get("demand_response_active"):
+        status = f"{status} · DR"
+    if plan.get("peak_shaving_active"):
+        status = f"{status} · пик-шейвинг"
+    return {
+        "pool_power_kw": pool_power_kw,
+        "status": status,
+        "green_saved_kwh": green_saved_kwh,
+        "overload_kw": overload_kw,
+        "avoided_import_kwh": avoided_import_kwh,
     }
-
-    def _cell(value: str) -> str:
-        return colors.get(value, "")
-
-    return frame.style.map(_cell, subset=["Decision"])
 
 
 def apply_preset(preset: dict[str, Any]) -> None:
@@ -376,6 +445,8 @@ def apply_preset(preset: dict[str, Any]) -> None:
 def payload_from_state(scenario_id: str) -> dict[str, Any]:
     return {
         "scenario": scenario_id,
+        "demand_response_active": bool(st.session_state.demand_response_active),
+        "peak_shaving_active": bool(st.session_state.peak_shaving_active),
         "site": {
             "name": "Yerevan prosumer site",
             "pv_capacity_kwp": float(st.session_state.pv_capacity_kwp),
@@ -401,11 +472,11 @@ def payload_from_state(scenario_id: str) -> dict[str, Any]:
 
 
 def render_sidebar(catalog: dict[str, Any]) -> str:
-    st.sidebar.markdown("### Site and battery")
+    st.sidebar.markdown("### Площадка и батарея")
     presets = catalog["scenarios"]
     labels = {item["id"]: item["title"] for item in presets}
     scenario_id = st.sidebar.selectbox(
-        "Day",
+        "День",
         options=[item["id"] for item in presets],
         format_func=lambda item: labels[item],
         key="scenario_id",
@@ -417,27 +488,27 @@ def render_sidebar(catalog: dict[str, Any]) -> str:
 
     tariff_labels = {item["id"]: item["title"] for item in catalog["tariff_profiles"]}
     st.sidebar.selectbox(
-        "Tariff",
+        "Тариф",
         options=list(tariff_labels),
         format_func=lambda item: tariff_labels[item],
         key="tariff_profile",
     )
-    st.sidebar.slider("PV array (kWp)", 0.0, 40.0, step=0.5, key="pv_capacity_kwp")
-    st.sidebar.slider("Daily load (kWh)", 0.0, 120.0, step=1.0, key="daily_load_kwh")
-    st.sidebar.slider("Cloud cover", 0.0, 1.0, step=0.01, key="cloud_cover")
-    st.sidebar.slider("Battery capacity (kWh)", 0.0, 80.0, step=0.5, key="capacity_kwh")
-    st.sidebar.slider("Inverter power (kW)", 0.0, 40.0, step=0.5, key="power_kw")
-    st.sidebar.slider("Starting state of charge", 0.0, 1.0, step=0.01, key="soc_initial")
-    st.sidebar.slider("Wear (AMD per kWh moved)", 0.0, 20.0, step=0.5, key="degradation_amd_per_kwh")
-    st.sidebar.number_input("Weather seed", min_value=0, max_value=10_000_000, step=1, key="seed")
+    st.sidebar.slider("Мощность СЭС (кВт·пик)", 0.0, 40.0, step=0.5, key="pv_capacity_kwp")
+    st.sidebar.slider("Суточная нагрузка (кВт·ч)", 0.0, 120.0, step=1.0, key="daily_load_kwh")
+    st.sidebar.slider("Облачность", 0.0, 1.0, step=0.01, key="cloud_cover")
+    st.sidebar.slider("Ёмкость накопителя (кВт·ч)", 0.0, 80.0, step=0.5, key="capacity_kwh")
+    st.sidebar.slider("Мощность инвертора (кВт)", 0.0, 40.0, step=0.5, key="power_kw")
+    st.sidebar.slider("Начальный заряд", 0.0, 1.0, step=0.01, key="soc_initial")
+    st.sidebar.slider("Износ (AMD за кВт·ч)", 0.0, 20.0, step=0.5, key="degradation_amd_per_kwh")
+    st.sidebar.number_input("Зерно погоды", min_value=0, max_value=10_000_000, step=1, key="seed")
 
-    with st.sidebar.expander("Battery limits"):
-        st.slider("Minimum SOC", 0.0, 0.5, step=0.01, key="soc_min")
-        st.slider("Maximum SOC", 0.5, 1.0, step=0.01, key="soc_max")
-        st.slider("Charge efficiency", 0.70, 1.0, step=0.01, key="charge_efficiency")
-        st.slider("Discharge efficiency", 0.70, 1.0, step=0.01, key="discharge_efficiency")
-        st.slider("Sunrise hour", 4.0, 9.0, step=0.1, key="sunrise_hour")
-        st.slider("Sunset hour", 16.0, 22.0, step=0.1, key="sunset_hour")
+    with st.sidebar.expander("Пределы батареи"):
+        st.slider("Минимальный SOC", 0.0, 0.5, step=0.01, key="soc_min")
+        st.slider("Максимальный SOC", 0.5, 1.0, step=0.01, key="soc_max")
+        st.slider("КПД заряда", 0.70, 1.0, step=0.01, key="charge_efficiency")
+        st.slider("КПД разряда", 0.70, 1.0, step=0.01, key="discharge_efficiency")
+        st.slider("Восход", 4.0, 9.0, step=0.1, key="sunrise_hour")
+        st.slider("Закат", 16.0, 22.0, step=0.1, key="sunset_hour")
     return scenario_id
 
 
@@ -457,131 +528,196 @@ def ensure_catalog(base_url: str) -> dict[str, Any]:
     return st.session_state.catalog
 
 
+def _require_roles(plan: dict[str, Any]) -> bool:
+    required = ("seller_revenue_amd", "buyer_hourly_costs", "seller_sales_log")
+    if all(key in plan for key in required):
+        return True
+    st.error("API вернул план без кабинетов продавца и покупателя. Перезапустите backend.")
+    return False
+
+
+def render_dispatcher(plan: dict[str, Any]) -> None:
+    view = dispatcher_view(plan)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Суммарная мощность пула (кВт)", f"{view['pool_power_kw']:.1f}")
+    c2.metric("Общий статус балансировки", str(view["status"]))
+    c3.metric("Спасено от сброса (кВт·ч)", f"{view['green_saved_kwh']:.1f}")
+    c4.metric(
+        "Предотвращенные потери перегрузки",
+        f"{view['overload_kw']:.1f} кВт",
+        f"{view['avoided_import_kwh']:.1f} кВт·ч импорта",
+    )
+    st.caption(
+        "Спасенная зеленая энергия — солнце, принятое накопителем пула. "
+        "Потери перегрузки — насколько пиковый импорт ниже дня без батареи. "
+        "Батарея на графике: разряд выше нуля, заряд ниже. Сеть: импорт выше нуля, экспорт ниже."
+    )
+
+    st.subheader("Суточный баланс мощностей")
+    st.plotly_chart(
+        chart_balance(plan["hours"], bool(plan.get("demand_response_active"))),
+        width="stretch",
+        config={"displayModeBar": False},
+    )
+    st.subheader("Оптовые спотовые цены и арбитраж")
+    st.plotly_chart(
+        chart_spot_prices(plan["hours"], bool(plan.get("demand_response_active"))),
+        width="stretch",
+        config={"displayModeBar": False},
+    )
+    st.subheader("Уровень заряда накопителя пула")
+    st.plotly_chart(
+        chart_soc(plan["hours"], plan["battery"], bool(plan.get("demand_response_active"))),
+        width="stretch",
+        config={"displayModeBar": False},
+    )
+
+    st.subheader("Пульт Demand Response")
+    active = bool(st.session_state.demand_response_active)
+    if active:
+        st.success("Команда оператора сети активна: нагрузка снижена на 40% в окне 18:00–21:00.")
+    st.button(
+        "Эмулировать команду оператора сети (Сброс нагрузки на 40% в вечерний пик 18:00–21:00)",
+        type="primary",
+        disabled=active,
+        on_click=_activate_demand_response,
+    )
+    if active:
+        st.button("Снять команду оператора", on_click=_clear_demand_response)
+
+
+def _activate_demand_response() -> None:
+    st.session_state.demand_response_active = True
+
+
+def _clear_demand_response() -> None:
+    st.session_state.demand_response_active = False
+
+
+def render_seller(plan: dict[str, Any]) -> None:
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Сгенерировано солнцем (кВт·ч)", f"{plan['seller_total_solar_kwh']:.1f}")
+    c2.metric("Продано в сеть по высокой цене (кВт·ч)", f"{plan['seller_total_sold_kwh']:.1f}")
+    c3.metric("Валовый доход (AMD)", f"{plan['seller_revenue_amd']:,.0f}")
+    c4.metric("Комиссия сервиса VoltSync (15%) (AMD)", f"{plan['seller_success_fee_amd']:,.0f}")
+    c5.metric("Чистая прибыль владельца (AMD)", f"{plan['seller_net_profit_amd']:,.0f}")
+    wear_amd = float(plan["battery"]["degradation_amd_per_kwh"]) * sum(
+        float(row["charge_kwh"]) + float(row["discharge_kwh"]) for row in plan["hours"]
+    )
+    grid_charge_amd = sum(
+        float(row["grid_to_battery_kwh"]) * float(row["buy_price_amd"]) for row in plan["hours"]
+    )
+    st.caption(
+        "Объем продаж — энергия солнца и накопителя, отданная в сеть и пул. "
+        f"Комиссия 15% считается с дополнительной выгоды сверх пассивного сброса излишка. "
+        f"Чистая прибыль = {plan['seller_revenue_amd']:,.0f} − комиссия {plan['seller_success_fee_amd']:,.0f} "
+        f"− закупка в накопитель {grid_charge_amd:,.0f} − износ {wear_amd:,.0f} AMD. "
+        "Зеленым отмечены часы с наибольшим начислением."
+    )
+    st.subheader("История продаж")
+    frame = sales_frame(plan["seller_sales_log"])
+    st.dataframe(paint_sales(frame), hide_index=True, width="stretch", height=480)
+    st.subheader("Накопление дохода за сутки")
+    st.plotly_chart(
+        chart_cumulative_revenue(plan["seller_sales_log"]),
+        width="stretch",
+        config={"displayModeBar": False},
+    )
+
+
+def render_buyer(plan: dict[str, Any]) -> None:
+    baseline = float(plan["buyer_baseline_cost_amd"])
+    optimized = float(plan["buyer_optimized_cost_amd"])
+    savings = float(plan["buyer_savings_amd"])
+    savings_pct = 0.0 if baseline <= 1e-9 else 100.0 * savings / baseline
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Потреблено объектом (кВт·ч)", f"{plan['buyer_total_consumed_kwh']:.1f}")
+    c2.metric("Закрыто накопителем (кВт·ч)", f"{plan['buyer_covered_by_storage_kwh']:.1f}")
+    c3.metric("Счет за электричество без VoltSync (AMD)", f"{baseline:,.0f}")
+    c4.metric(
+        "Итоговый счет к оплате с VoltSync (AMD)",
+        f"{optimized:,.0f}",
+        f"{optimized - baseline:,.0f}",
+        delta_color="inverse",
+    )
+    c5.metric("Экономия на вечернем пике (AMD)", f"{savings:,.0f}", f"{savings_pct:.0f}%")
+    direct_solar = max(
+        0.0,
+        float(plan["buyer_total_consumed_kwh"])
+        - float(plan["buyer_covered_by_storage_kwh"])
+        - float(plan["buyer_grid_bought_kwh"]),
+    )
+    st.caption(
+        f"Без VoltSync весь объем покупается по тарифу сети. С VoltSync остаток "
+        f"{plan['buyer_grid_bought_kwh']:.1f} кВт·ч берется из сети, "
+        f"{direct_solar:.1f} кВт·ч закрывает прямое солнце, накопитель срезает дорогой пик. "
+        "Энергия пула считается по оптовой цене."
+    )
+    st.toggle(
+        "Автоматический пик-шейвинг (Запрет потребления из сети при цене выше 50 AMD)",
+        key="peak_shaving_active",
+    )
+    if plan.get("peak_shaving_active"):
+        st.info(
+            "Пик-шейвинг включен: при тарифе выше 50 AMD объект не покупает энергию из сети, "
+            "пока солнце и накопитель закрывают нагрузку."
+        )
+    else:
+        st.caption(
+            "На ясном летнем дне пул и так закрывает часы дороже 50 AMD. "
+            "Переключатель меняет диспетчеризацию, когда вечерняя продажа выгоднее собственного потребления "
+            "(сценарий Evening export spike): нагрузка уходит с сети на накопитель."
+        )
+    st.subheader("Стоимость закупки: до и после")
+    st.plotly_chart(
+        chart_buyer_costs(plan["buyer_hourly_costs"], bool(plan.get("demand_response_active"))),
+        width="stretch",
+        config={"displayModeBar": False},
+    )
+
+
 def render_plan(plan: dict[str, Any]) -> None:
-    kpis = plan["kpis"]
+    if not _require_roles(plan):
+        return
+    title = html.escape(str(plan["scenario_title"]))
+    solver = html.escape(str(plan["solver"]))
     st.markdown(
         f"""
         <div class="vs-hero">
-          <div class="vs-kicker">VoltSync VPP · {plan["scenario_title"]}</div>
-          <h1 class="vs-title">Store, use, or sell?</h1>
-          <p class="vs-sub">24-hour battery dispatch for a Yerevan prosumer. Solved as a linear program with {plan["solver"]} in {plan["solve_time_ms"]:.0f} ms.</p>
+          <div class="vs-kicker">VoltSync VPP · {title}</div>
+          <h1 class="vs-title">Диспетчер, продавец и покупатель</h1>
+          <p class="vs-sub">Один суточный план пула для трех кабинетов. Решено солвером {solver} за {plan["solve_time_ms"]:.0f} мс.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown(
-        f'<div class="vs-summary">{html.escape(plan["summary"])}</div>',
-        unsafe_allow_html=True,
+    dispatcher, seller, buyer = st.tabs(
+        [
+            "⚡ Диспетчер VPP (Сеть)",
+            "☀️️ Кабинет Продавца (Генерация)",
+            "🏢 Кабинет Покупателя (Потребление)",
+        ]
     )
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Saved vs no battery", f"{kpis['savings_amd']:,.0f} AMD", f"{kpis['savings_pct']:.0f}%")
-    c2.metric(
-        "If this day repeated",
-        f"{kpis['illustrative_annual_savings_amd']:,.0f} AMD",
-        "365 identical days",
-    )
-    c3.metric("Self-sufficiency", f"{kpis['self_sufficiency_pct']:.0f}%", f"{kpis['cycles']:.2f} battery cycles")
-    co2 = kpis["co2_delta_kg"]
-    c4.metric(
-        "Grid CO₂ vs no battery",
-        f"{co2:+.1f} kg",
-        "negative means less CO₂",
-        delta_color="off",
-    )
-
-    d1, d2, d3, d4 = st.columns(4)
-    d1.metric("Store", f"{kpis['hours_store']} h")
-    d2.metric("Use", f"{kpis['hours_use']} h")
-    d3.metric("Sell", f"{kpis['hours_sell']} h")
-    d4.metric("Idle", f"{kpis['hours_idle']} h")
-
-    st.plotly_chart(chart_decisions(plan["hours"]), width="stretch", config={"displayModeBar": False})
-
-    left, right = st.columns([1.15, 0.85])
-    with left:
-        st.subheader("What the battery does")
-        for block in plan["blocks"]:
-            color = DECISION_COLOR[block["decision"]]
-            st.markdown(
-                f"""
-                <div class="vs-block" style="border-left: 4px solid {color}">
-                  <b>{block["label"]} · {DECISION_LABEL[block["decision"]]}</b><br/>
-                  {block["text"]}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-    with right:
-        st.subheader("Day totals")
-        totals = pd.DataFrame(
-            [
-                ("Solar generation", f"{kpis['solar_kwh']:.1f} kWh"),
-                ("Site load", f"{kpis['load_kwh']:.1f} kWh"),
-                ("Energy charged", f"{kpis['charged_kwh']:.1f} kWh"),
-                ("Energy discharged", f"{kpis['discharged_kwh']:.1f} kWh"),
-                ("Grid import", f"{kpis['grid_import_kwh']:.1f} kWh"),
-                ("Grid import, no battery", f"{kpis['baseline_import_kwh']:.1f} kWh"),
-                ("Grid export", f"{kpis['grid_export_kwh']:.1f} kWh"),
-                ("Grid export, no battery", f"{kpis['baseline_export_kwh']:.1f} kWh"),
-                ("Peak import", f"{kpis['max_grid_import_kw']:.1f} kW"),
-                ("Peak import, no battery", f"{kpis['baseline_max_grid_import_kw']:.1f} kW"),
-                ("Net cost", f"{kpis['optimized_net_cost_amd']:,.0f} AMD"),
-                ("Net cost, no battery", f"{kpis['baseline_net_cost_amd']:,.0f} AMD"),
-                ("Curtailed solar", f"{kpis['curtailed_kwh']:.1f} kWh"),
-            ],
-            columns=["Metric", "Value"],
-        )
-        st.dataframe(totals, hide_index=True, width="stretch", height=460)
-
-    st.plotly_chart(chart_energy(plan["hours"]), width="stretch", config={"displayModeBar": False})
-    st.plotly_chart(
-        chart_soc_prices(plan["hours"], plan["battery"]),
-        width="stretch",
-        config={"displayModeBar": False},
-    )
-    st.plotly_chart(chart_grid(plan["hours"]), width="stretch", config={"displayModeBar": False})
-
-    frame = schedule_frame(plan["hours"])
-    st.subheader("Hourly schedule")
-    st.dataframe(paint_decision(frame), hide_index=True, width="stretch", height=480)
-    st.download_button(
-        "Download schedule CSV",
-        data=frame.to_csv(index=False).encode("utf-8"),
-        file_name="voltsync_schedule.csv",
-        mime="text/csv",
-    )
-    with st.expander("How the decision is made"):
-        st.markdown(
-            """
-            Each hour the linear program splits rooftop solar between the load, the battery and the grid,
-            and decides whether the battery charges or discharges. The objective is export revenue minus
-            import cost minus a wear charge on every kilowatt-hour moved.
-
-            The battery cannot finish the day emptier than it started, so a saving is not just spent inventory.
-            **Store** means the hour is dominated by charging. **Use** means the battery covers the load,
-            or live solar does when the battery is idle. **Sell** means energy is exported.
-            Doing both charge and discharge in one hour wastes a round trip, so the optimum keeps them apart.
-
-            Tariffs are a demo time-of-use book in AMD, not an official utility schedule.
-            The annual figure repeats this single day 365 times.
-            """
-        )
-    with st.expander("API response"):
-        st.json(plan)
+    with dispatcher:
+        render_dispatcher(plan)
+    with seller:
+        render_seller(plan)
+    with buyer:
+        render_buyer(plan)
 
 
 def main() -> None:
+    _init_role_flags()
     base_url = st.sidebar.text_input("API", value=DEFAULT_API_URL, key="api_input")
     try:
         health = api_get(base_url, "/health")
     except ApiError as exc:
-        st.sidebar.error("API offline")
+        st.sidebar.error("API недоступен")
         st.error(str(exc))
-        st.info("Start the API from the project root: `uvicorn backend.main:app --reload --port 8000`")
+        st.info("Запустите API из корня проекта: `uvicorn backend.main:app --reload --port 8000`")
         return
 
-    solver_state = "CBC ready" if health.get("solver_available") else "CBC missing"
+    solver_state = "CBC готов" if health.get("solver_available") else "CBC не найден"
     st.sidebar.success(f"{health.get('service')} {health.get('version')} · {solver_state}")
 
     try:
@@ -594,7 +730,7 @@ def main() -> None:
 
     render_plan(plan)
     st.markdown(
-        '<p class="vs-note">VoltSync VPP · GreenTech Armenia · Energy storage · synthetic Yerevan day</p>',
+        '<p class="vs-note">VoltSync VPP · три роли одного пула · синтетический день Еревана</p>',
         unsafe_allow_html=True,
     )
 

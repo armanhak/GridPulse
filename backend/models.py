@@ -144,7 +144,33 @@ class Kpis(BaseModel):
     baseline_max_grid_import_kw: float
 
 
+class SellerSale(BaseModel):
+    """One hour of energy sold by the prosumer into the pool or the grid."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hour: int = Field(ge=0, le=23)
+    volume_kwh: float = Field(ge=0.0)
+    price_amd: float = Field(ge=0.0)
+    revenue_amd: float = Field(ge=0.0)
+
+
+class BuyerHourlyCost(BaseModel):
+    """One hour of the commercial buyer's bill, before and after the pool."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hour: int = Field(ge=0, le=23)
+    consumed_kwh: float = Field(ge=0.0)
+    covered_by_storage_kwh: float = Field(ge=0.0)
+    grid_bought_kwh: float = Field(ge=0.0)
+    baseline_cost_amd: float = Field(ge=0.0)
+    optimized_cost_amd: float = Field(ge=0.0)
+
+
 class PlanResponse(BaseModel):
+    """Optimization response for the three-role VPP: dispatcher, seller, and buyer."""
+
     scenario: str | None
     scenario_title: str
     summary: str
@@ -156,6 +182,21 @@ class PlanResponse(BaseModel):
     kpis: Kpis
     blocks: list[ScheduleBlock]
     hours: list[HourSchedule]
+    demand_response_active: bool = False
+    peak_shaving_active: bool = False
+    seller_total_solar_kwh: float = 0.0
+    seller_total_sold_kwh: float = 0.0
+    seller_revenue_amd: float = 0.0
+    seller_success_fee_amd: float = 0.0
+    seller_net_profit_amd: float = 0.0
+    seller_sales_log: list[SellerSale] = Field(default_factory=list)
+    buyer_total_consumed_kwh: float = 0.0
+    buyer_covered_by_storage_kwh: float = 0.0
+    buyer_grid_bought_kwh: float = 0.0
+    buyer_baseline_cost_amd: float = 0.0
+    buyer_optimized_cost_amd: float = 0.0
+    buyer_savings_amd: float = 0.0
+    buyer_hourly_costs: list[BuyerHourlyCost] = Field(default_factory=list)
 
 
 class PlanRequest(BaseModel):
@@ -166,6 +207,8 @@ class PlanRequest(BaseModel):
     scenario: str | None = "yerevan_summer"
     site: SiteConfig | None = None
     battery: BatteryConfig | None = None
+    demand_response_active: bool = False
+    peak_shaving_active: bool = False
 
 
 class OptimizeRequest(BaseModel):
@@ -176,6 +219,8 @@ class OptimizeRequest(BaseModel):
     battery: BatteryConfig = Field(default_factory=BatteryConfig)
     site: SiteConfig | None = None
     hours: list[ForecastPoint]
+    demand_response_active: bool = False
+    peak_shaving_active: bool = False
 
     @model_validator(mode="after")
     def _check_horizon(self) -> OptimizeRequest:

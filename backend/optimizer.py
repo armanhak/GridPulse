@@ -28,11 +28,13 @@ import pulp
 
 from .models import (
     BatteryConfig,
+    BuyerHourlyCost,
     ForecastPoint,
     HourSchedule,
     Kpis,
     PlanResponse,
     ScheduleBlock,
+    SellerSale,
     SiteConfig,
 )
 
@@ -41,6 +43,13 @@ from .models import (
 GRID_CO2_KG_PER_KWH = 0.21
 DECISION_EPS_KWH = 0.05
 SOLVER_NAME = "CBC"
+PLATFORM_FEE_RATE = 0.15
+PEAK_SHAVING_PRICE_AMD = 50.0
+# Soft penalty so a physical shortfall stays feasible, but grid consumption
+# above the threshold is used only when solar and the battery cannot cover the load.
+PEAK_SHAVING_PENALTY_AMD = 5_000.0
+DEMAND_RESPONSE_HOURS = frozenset(range(18, 21))
+DEMAND_RESPONSE_KEEP = 0.60
 
 
 class OptimizationError(Exception):
@@ -201,6 +210,105 @@ def _blocks(rows: list[HourSchedule]) -> list[ScheduleBlock]:
     return blocks
 
 
+def _apply_demand_response(hours: list[ForecastPoint]) -> list[ForecastPoint]:
+    """Cut 40% of the commercial load during the evening peak window 18:00–21:00."""
+    adjusted: list[ForecastPoint] = []
+    for point in hours:
+        if point.hour not in DEMAND_RESPONSE_HOURS:
+            adjusted.append(point)
+            continue
+        adjusted.append(
+            point.model_copy(update={"load_kwh": round(point.load_kwh * DEMAND_RESPONSE_KEEP, 4)})
+        )
+    return adjusted
+
+
+def _settle_roles(
+    schedule: list[HourSchedule],
+    battery: BatteryConfig,
+) -> dict[str, float | list[SellerSale] | list[BuyerHourlyCost]]:
+    """Split one pool dispatch into a seller invoice and a buyer bill.
+
+    The seller owns the PV array and the battery. Energy delivered to the
+    buyer's load or exported to the grid is sold at the wholesale price.
+    Without VoltSync the seller would only be paid for the instantaneous
+    surplus export. The platform keeps 15% of that extra benefit.
+
+    The buyer, without VoltSync, buys the whole load at the retail tariff.
+    With the pool, residual grid energy stays on the retail tariff and energy
+    from solar or storage is settled at the wholesale price.
+    """
+    sales: list[SellerSale] = []
+    buyer_hours: list[BuyerHourlyCost] = []
+    passive_export_revenue = 0.0
+    grid_purchase_cost = 0.0
+    wear_cost = 0.0
+
+    for row in schedule:
+        volume = (
+            row.pv_to_grid_kwh
+            + row.battery_to_grid_kwh
+            + row.pv_to_load_kwh
+            + row.battery_to_load_kwh
+        )
+        revenue = volume * row.sell_price_amd
+        sales.append(
+            SellerSale(
+                hour=row.hour,
+                volume_kwh=round(volume, 3),
+                price_amd=round(row.sell_price_amd, 2),
+                revenue_amd=round(revenue, 2),
+            )
+        )
+        passive_export_revenue += row.baseline_export_kwh * row.sell_price_amd
+        grid_purchase_cost += row.grid_to_battery_kwh * row.buy_price_amd
+        wear_cost += (row.charge_kwh + row.discharge_kwh) * battery.degradation_amd_per_kwh
+
+        baseline_cost = row.load_kwh * row.buy_price_amd
+        optimized_cost = row.grid_to_load_kwh * row.buy_price_amd + (
+            row.pv_to_load_kwh + row.battery_to_load_kwh
+        ) * row.sell_price_amd
+        buyer_hours.append(
+            BuyerHourlyCost(
+                hour=row.hour,
+                consumed_kwh=round(row.load_kwh, 3),
+                covered_by_storage_kwh=round(row.battery_to_load_kwh, 3),
+                grid_bought_kwh=round(row.grid_to_load_kwh, 3),
+                baseline_cost_amd=round(baseline_cost, 2),
+                optimized_cost_amd=round(optimized_cost, 2),
+            )
+        )
+
+    seller_revenue = round(sum(item.revenue_amd for item in sales), 2)
+    passive_export_revenue = round(passive_export_revenue, 2)
+    grid_purchase_cost = round(grid_purchase_cost, 2)
+    wear_cost = round(wear_cost, 2)
+    operating_profit = seller_revenue - grid_purchase_cost - wear_cost
+    additional_benefit = max(0.0, operating_profit - passive_export_revenue)
+    success_fee = round(PLATFORM_FEE_RATE * additional_benefit, 2)
+    net_profit = round(operating_profit - success_fee, 2)
+
+    buyer_baseline = round(sum(item.baseline_cost_amd for item in buyer_hours), 2)
+    buyer_optimized = round(sum(item.optimized_cost_amd for item in buyer_hours), 2)
+    return {
+        "seller_total_solar_kwh": round(sum(row.solar_kwh for row in schedule), 3),
+        "seller_total_sold_kwh": round(sum(item.volume_kwh for item in sales), 3),
+        "seller_revenue_amd": seller_revenue,
+        "seller_success_fee_amd": success_fee,
+        "seller_net_profit_amd": net_profit,
+        "seller_sales_log": sales,
+        "buyer_total_consumed_kwh": round(sum(row.load_kwh for row in schedule), 3),
+        "buyer_covered_by_storage_kwh": round(
+            sum(item.covered_by_storage_kwh for item in buyer_hours), 3
+        ),
+        "buyer_grid_bought_kwh": round(sum(item.grid_bought_kwh for item in buyer_hours), 3),
+        "buyer_baseline_cost_amd": buyer_baseline,
+        "buyer_optimized_cost_amd": buyer_optimized,
+        "buyer_savings_amd": round(buyer_baseline - buyer_optimized, 2),
+        "buyer_hourly_costs": buyer_hours,
+    }
+
+
 def _summary(kpis: Kpis, blocks: list[ScheduleBlock]) -> str:
     active = [block for block in blocks if block.decision != "idle"]
     schedule = " ".join(f"{block.label} {block.decision}." for block in active)
@@ -235,10 +343,15 @@ def optimize_day(
     scenario: str | None = None,
     scenario_title: str = "Custom day",
     site: SiteConfig | None = None,
+    demand_response_active: bool = False,
+    peak_shaving_active: bool = False,
 ) -> PlanResponse:
-    """Solve one day and return the schedule, KPIs and a plain-language summary."""
+    """Solve one day and return the schedule, KPIs and seller/buyer accounts."""
     if [point.hour for point in hours] != list(range(24)):
         raise OptimizationError("Forecast must contain hours 0 through 23 in order", status="InvalidForecast")
+    if demand_response_active:
+        hours = _apply_demand_response(hours)
+        scenario_title = f"{scenario_title} · DR 18:00–21:00"
 
     capacity = battery.capacity_kwh
     initial = battery.soc_initial * capacity
@@ -280,6 +393,10 @@ def optimize_day(
         )
         problem += pv_batt[hour] + grid_batt[hour] <= max_charge, f"charge_power_{hour}"
         problem += batt_load[hour] + batt_grid[hour] <= max_discharge, f"discharge_power_{hour}"
+        if peak_shaving_active and point.buy_price_amd > PEAK_SHAVING_PRICE_AMD:
+            peak_slack = problem.add_variable(f"peak_slack_{hour}", lowBound=0)
+            problem += grid_load[hour] <= peak_slack, f"peak_shave_{hour}"
+            profit_terms.append(-PEAK_SHAVING_PENALTY_AMD * peak_slack)
         problem += (
             soc[hour + 1]
             == soc[hour]
@@ -431,6 +548,7 @@ def optimize_day(
     )
     plan_blocks = _blocks(schedule)
     resolved_site = site or SiteConfig()
+    accounts = _settle_roles(schedule, battery)
     return PlanResponse(
         scenario=scenario,
         scenario_title=scenario_title,
@@ -443,6 +561,21 @@ def optimize_day(
         kpis=kpis,
         blocks=plan_blocks,
         hours=schedule,
+        demand_response_active=demand_response_active,
+        peak_shaving_active=peak_shaving_active,
+        seller_total_solar_kwh=accounts["seller_total_solar_kwh"],
+        seller_total_sold_kwh=accounts["seller_total_sold_kwh"],
+        seller_revenue_amd=accounts["seller_revenue_amd"],
+        seller_success_fee_amd=accounts["seller_success_fee_amd"],
+        seller_net_profit_amd=accounts["seller_net_profit_amd"],
+        seller_sales_log=accounts["seller_sales_log"],
+        buyer_total_consumed_kwh=accounts["buyer_total_consumed_kwh"],
+        buyer_covered_by_storage_kwh=accounts["buyer_covered_by_storage_kwh"],
+        buyer_grid_bought_kwh=accounts["buyer_grid_bought_kwh"],
+        buyer_baseline_cost_amd=accounts["buyer_baseline_cost_amd"],
+        buyer_optimized_cost_amd=accounts["buyer_optimized_cost_amd"],
+        buyer_savings_amd=accounts["buyer_savings_amd"],
+        buyer_hourly_costs=accounts["buyer_hourly_costs"],
     )
 
 
@@ -452,6 +585,17 @@ def _print_plan(plan: PlanResponse) -> None:
     print(
         f"solar {plan.kpis.solar_kwh:.1f} kWh | load {plan.kpis.load_kwh:.1f} kWh | "
         f"import {plan.kpis.grid_import_kwh:.1f} vs baseline {plan.kpis.baseline_import_kwh:.1f}"
+    )
+    print(
+        f"seller sold {plan.seller_total_sold_kwh:.1f} kWh | "
+        f"revenue {plan.seller_revenue_amd:.0f} | fee {plan.seller_success_fee_amd:.0f} | "
+        f"net {plan.seller_net_profit_amd:.0f}"
+    )
+    print(
+        f"buyer load {plan.buyer_total_consumed_kwh:.1f} kWh | "
+        f"storage {plan.buyer_covered_by_storage_kwh:.1f} | "
+        f"bill {plan.buyer_optimized_cost_amd:.0f} vs {plan.buyer_baseline_cost_amd:.0f} | "
+        f"saved {plan.buyer_savings_amd:.0f}"
     )
     print("hour decision  charge  disch  soc%   import  export  cost")
     for row in plan.hours:
@@ -479,6 +623,26 @@ if __name__ == "__main__":
         if plan.kpis.savings_amd < -0.05:
             print("ERROR: savings below baseline")
             failed = True
+        if abs(sum(item.volume_kwh for item in plan.seller_sales_log) - plan.seller_total_sold_kwh) > 0.05:
+            print("ERROR: seller sales log does not match sold volume")
+            failed = True
+        if abs(sum(item.revenue_amd for item in plan.seller_sales_log) - plan.seller_revenue_amd) > 0.1:
+            print("ERROR: seller sales log does not match revenue")
+            failed = True
+        if plan.seller_success_fee_amd < -0.01 or plan.seller_success_fee_amd > plan.seller_revenue_amd + 0.05:
+            print("ERROR: seller success fee is outside 0..revenue")
+            failed = True
+        if abs(
+            plan.buyer_savings_amd - (plan.buyer_baseline_cost_amd - plan.buyer_optimized_cost_amd)
+        ) > 0.1:
+            print("ERROR: buyer savings do not match the two bills")
+            failed = True
+        if abs(sum(item.baseline_cost_amd for item in plan.buyer_hourly_costs) - plan.buyer_baseline_cost_amd) > 0.1:
+            print("ERROR: buyer hourly baseline does not match the bill")
+            failed = True
+        if abs(plan.buyer_total_consumed_kwh - plan.kpis.load_kwh) > 0.05:
+            print("ERROR: buyer consumption does not match site load")
+            failed = True
         for row in plan.hours:
             if row.charge_kwh > 0.05 and row.discharge_kwh > 0.05:
                 print(f"ERROR: simultaneous charge and discharge at {row.label}")
@@ -493,6 +657,41 @@ if __name__ == "__main__":
             if abs(balance_pv - row.solar_kwh) > 0.02 or abs(balance_load - row.load_kwh) > 0.02:
                 print(f"ERROR: energy balance broken at {row.label}")
                 failed = True
+    summer = SCENARIOS["yerevan_summer"]
+    base_forecast = build_forecast(summer.site, scenario="yerevan_summer", scenario_title=summer.title)
+    base_plan = optimize_day(
+        base_forecast.hours,
+        summer.battery,
+        scenario="yerevan_summer",
+        scenario_title=summer.title,
+        site=summer.site,
+    )
+    dr_plan = optimize_day(
+        base_forecast.hours,
+        summer.battery,
+        scenario="yerevan_summer",
+        scenario_title=summer.title,
+        site=summer.site,
+        demand_response_active=True,
+    )
+    for hour in DEMAND_RESPONSE_HOURS:
+        expected = round(base_plan.hours[hour].load_kwh * DEMAND_RESPONSE_KEEP, 3)
+        actual = dr_plan.hours[hour].load_kwh
+        if abs(actual - expected) > 0.05:
+            print(f"ERROR: demand response did not cut hour {hour}: {actual} vs {expected}")
+            failed = True
+    peak_plan = optimize_day(
+        base_forecast.hours,
+        summer.battery,
+        scenario="yerevan_summer",
+        scenario_title=summer.title,
+        site=summer.site,
+        peak_shaving_active=True,
+    )
+    for row in peak_plan.hours:
+        if row.buy_price_amd > PEAK_SHAVING_PRICE_AMD and row.grid_to_load_kwh > 0.15:
+            print(f"ERROR: peak shaving still buys {row.grid_to_load_kwh} kWh at {row.label}")
+            failed = True
     if failed:
         raise SystemExit(1)
     print("\nAll scenarios solved with a feasible, balanced dispatch.")

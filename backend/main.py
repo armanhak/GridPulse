@@ -27,10 +27,11 @@ logger = logging.getLogger("voltsync")
 app = FastAPI(
     title="VoltSync VPP",
     version=__version__,
-    summary="Store, use, or sell — 24-hour battery dispatch for a prosumer site.",
+    summary="Three-role VPP dispatch: network balance, seller revenue, buyer bill.",
     description=(
         "Generates a synthetic Yerevan day (solar, load, tariffs) and solves a "
-        "linear program that dispatches a battery to cut the energy bill."
+        "linear program for a shared pool. The same plan feeds the dispatcher, "
+        "the prosumer seller, and the commercial buyer."
     ),
 )
 
@@ -102,14 +103,26 @@ def optimize(request: OptimizeRequest) -> PlanResponse:
         scenario=None,
         scenario_title="Custom forecast",
         site=site,
+        demand_response_active=request.demand_response_active,
+        peak_shaving_active=request.peak_shaving_active,
     )
 
 
 @app.get("/api/v1/plan", response_model=PlanResponse, tags=["dispatch"])
 def plan_from_scenario(
     scenario: str = Query(default="yerevan_summer"),
+    demand_response_active: bool = Query(default=False),
+    peak_shaving_active: bool = Query(default=False),
 ) -> PlanResponse:
-    return _build_plan(PlanRequest(scenario=scenario, site=None, battery=None))
+    return _build_plan(
+        PlanRequest(
+            scenario=scenario,
+            site=None,
+            battery=None,
+            demand_response_active=demand_response_active,
+            peak_shaving_active=peak_shaving_active,
+        )
+    )
 
 
 @app.post("/api/v1/plan", response_model=PlanResponse, tags=["dispatch"])
@@ -124,10 +137,12 @@ def _build_plan(request: PlanRequest) -> PlanResponse:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     forecast = build_forecast(site, scenario=scenario_id, scenario_title=title)
     logger.info(
-        "Solving %s pv=%.1f kWp battery=%.1f kWh",
+        "Solving %s pv=%.1f kWp battery=%.1f kWh dr=%s peak_shave=%s",
         scenario_id or "custom",
         site.pv_capacity_kwp,
         battery.capacity_kwh,
+        request.demand_response_active,
+        request.peak_shaving_active,
     )
     return optimize_day(
         forecast.hours,
@@ -135,4 +150,6 @@ def _build_plan(request: PlanRequest) -> PlanResponse:
         scenario=scenario_id,
         scenario_title=title,
         site=site,
+        demand_response_active=request.demand_response_active,
+        peak_shaving_active=request.peak_shaving_active,
     )
