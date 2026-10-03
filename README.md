@@ -11,7 +11,7 @@
 
 ## Запуск на сервере
 
-Из каталога `voltsync-vpp`:
+Из корня репозитория:
 
 ```bash
 docker compose up --build -d
