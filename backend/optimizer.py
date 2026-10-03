@@ -44,6 +44,12 @@ GRID_CO2_KG_PER_KWH = 0.21
 DECISION_EPS_KWH = 0.05
 SOLVER_NAME = "CBC"
 PLATFORM_FEE_RATE = 0.15
+# The buyer pays this share above the retail tariff for pool energy.
+# The premium is the price of taking the peak off the congested grid.
+BUYER_SERVICE_PREMIUM = 0.20
+# The seller's pool offtake price keeps this share of the gap between the
+# cheap feed-in tariff and retail, so the owner earns more than a passive dump.
+SELLER_POOL_SHARE = 0.80
 PEAK_SHAVING_PRICE_AMD = 50.0
 # Soft penalty so a physical shortfall stays feasible, but grid consumption
 # above the threshold is used only when solar and the battery cannot cover the load.
@@ -223,6 +229,16 @@ def _apply_demand_response(hours: list[ForecastPoint]) -> list[ForecastPoint]:
     return adjusted
 
 
+def _seller_pool_price(buy_price: float, sell_price: float) -> float:
+    """Offtake price for energy sold to the buyer: above the feed-in tariff."""
+    return sell_price + SELLER_POOL_SHARE * max(0.0, buy_price - sell_price)
+
+
+def _buyer_pool_price(buy_price: float) -> float:
+    """Price the commercial buyer pays VoltSync: retail plus a service premium."""
+    return buy_price * (1.0 + BUYER_SERVICE_PREMIUM)
+
+
 def _settle_roles(
     schedule: list[HourSchedule],
     battery: BatteryConfig,
@@ -230,13 +246,15 @@ def _settle_roles(
     """Split one pool dispatch into a seller invoice and a buyer bill.
 
     The seller owns the PV array and the battery. Energy delivered to the
-    buyer's load or exported to the grid is sold at the wholesale price.
-    Without VoltSync the seller would only be paid for the instantaneous
-    surplus export. The platform keeps 15% of that extra benefit.
+    buyer is paid above the passive feed-in tariff. Exports to the wholesale
+    market stay on the spot sell price. The platform keeps 15% of the extra
+    benefit versus dumping surplus at the feed-in tariff.
 
-    The buyer, without VoltSync, buys the whole load at the retail tariff.
-    With the pool, residual grid energy stays on the retail tariff and energy
-    from solar or storage is settled at the wholesale price.
+    The buyer, without VoltSync, buys the whole load at the retail tariff and
+    leaves the evening peak on the grid. With the pool, leftover grid energy
+    stays on retail, and energy from solar or storage is sold at retail plus
+    a service premium. The bill is higher. The premium pays for taking that
+    peak off the congested network.
     """
     sales: list[SellerSale] = []
     buyer_hours: list[BuyerHourlyCost] = []
@@ -245,18 +263,17 @@ def _settle_roles(
     wear_cost = 0.0
 
     for row in schedule:
-        volume = (
-            row.pv_to_grid_kwh
-            + row.battery_to_grid_kwh
-            + row.pv_to_load_kwh
-            + row.battery_to_load_kwh
-        )
-        revenue = volume * row.sell_price_amd
+        pool_kwh = row.pv_to_load_kwh + row.battery_to_load_kwh
+        grid_kwh = row.pv_to_grid_kwh + row.battery_to_grid_kwh
+        volume = pool_kwh + grid_kwh
+        seller_price = _seller_pool_price(row.buy_price_amd, row.sell_price_amd)
+        revenue = pool_kwh * seller_price + grid_kwh * row.sell_price_amd
+        shown_price = revenue / volume if volume > 1e-9 else 0.0
         sales.append(
             SellerSale(
                 hour=row.hour,
                 volume_kwh=round(volume, 3),
-                price_amd=round(row.sell_price_amd, 2),
+                price_amd=round(shown_price, 2),
                 revenue_amd=round(revenue, 2),
             )
         )
@@ -265,9 +282,10 @@ def _settle_roles(
         wear_cost += (row.charge_kwh + row.discharge_kwh) * battery.degradation_amd_per_kwh
 
         baseline_cost = row.load_kwh * row.buy_price_amd
-        optimized_cost = row.grid_to_load_kwh * row.buy_price_amd + (
-            row.pv_to_load_kwh + row.battery_to_load_kwh
-        ) * row.sell_price_amd
+        optimized_cost = (
+            row.grid_to_load_kwh * row.buy_price_amd
+            + pool_kwh * _buyer_pool_price(row.buy_price_amd)
+        )
         buyer_hours.append(
             BuyerHourlyCost(
                 hour=row.hour,
@@ -680,6 +698,13 @@ if __name__ == "__main__":
         if abs(actual - expected) > 0.05:
             print(f"ERROR: demand response did not cut hour {hour}: {actual} vs {expected}")
             failed = True
+    passive_seller = sum(row.baseline_export_kwh * row.sell_price_amd for row in base_plan.hours)
+    if base_plan.seller_revenue_amd <= passive_seller + 1.0:
+        print("ERROR: seller revenue is not above the passive feed-in")
+        failed = True
+    if base_plan.buyer_optimized_cost_amd <= base_plan.buyer_baseline_cost_amd + 1.0:
+        print("ERROR: buyer bill is not above the retail tariff")
+        failed = True
     peak_plan = optimize_day(
         base_forecast.hours,
         summer.battery,

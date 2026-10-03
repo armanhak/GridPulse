@@ -80,6 +80,15 @@ st.markdown(
       }
       .vs-sub { color: #9aadc4; margin-top: 6px; font-size: 1.02rem; }
       .vs-note { color: #8ea0b8; font-size: 0.86rem; }
+      .vs-entry {
+        background: #121a2b;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        padding: 18px 18px 8px 18px;
+        min-height: 180px;
+      }
+      .vs-entry h3 { margin: 0 0 8px 0; color: #f4f8ff; }
+      .vs-entry p { color: #9aadc4; min-height: 72px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -349,7 +358,7 @@ def chart_buyer_costs(costs: list[dict[str, Any]], demand_response: bool) -> go.
         go.Bar(
             x=labels,
             y=[row["baseline_cost_amd"] for row in costs],
-            name="До VoltSync",
+            name="Тариф сети",
             marker_color=INDIGO,
         )
     )
@@ -357,8 +366,8 @@ def chart_buyer_costs(costs: list[dict[str, Any]], demand_response: bool) -> go.
         go.Bar(
             x=labels,
             y=[row["optimized_cost_amd"] for row in costs],
-            name="После VoltSync",
-            marker_color=EMERALD,
+            name="Счет VoltSync",
+            marker_color=AMBER,
         )
     )
     fig.update_layout(barmode="group")
@@ -440,6 +449,41 @@ def apply_preset(preset: dict[str, Any]) -> None:
     st.session_state.charge_efficiency = float(battery["charge_efficiency"])
     st.session_state.discharge_efficiency = float(battery["discharge_efficiency"])
     st.session_state.degradation_amd_per_kwh = float(battery["degradation_amd_per_kwh"])
+
+
+INPUT_KEYS = (
+    "scenario_id",
+    "tariff_profile",
+    "pv_capacity_kwp",
+    "daily_load_kwh",
+    "cloud_cover",
+    "capacity_kwh",
+    "power_kw",
+    "soc_initial",
+    "degradation_amd_per_kwh",
+    "seed",
+    "soc_min",
+    "soc_max",
+    "charge_efficiency",
+    "discharge_efficiency",
+    "sunrise_hour",
+    "sunset_hour",
+)
+
+
+def _remember_inputs() -> None:
+    if "pv_capacity_kwp" not in st.session_state:
+        return
+    st.session_state.saved_inputs = {
+        key: st.session_state[key] for key in INPUT_KEYS if key in st.session_state
+    }
+
+
+def _restore_inputs() -> None:
+    saved = st.session_state.get("saved_inputs") or {}
+    for key, value in saved.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
 def payload_from_state(scenario_id: str) -> dict[str, Any]:
@@ -607,9 +651,13 @@ def render_seller(plan: dict[str, Any]) -> None:
     grid_charge_amd = sum(
         float(row["grid_to_battery_kwh"]) * float(row["buy_price_amd"]) for row in plan["hours"]
     )
+    passive_amd = sum(
+        float(row["baseline_export_kwh"]) * float(row["sell_price_amd"]) for row in plan["hours"]
+    )
     st.caption(
-        "Объем продаж — энергия солнца и накопителя, отданная в сеть и пул. "
-        f"Комиссия 15% считается с дополнительной выгоды сверх пассивного сброса излишка. "
+        "Энергия, проданная покупателю, оплачивается выше пассивного сброса в сеть: "
+        "владелец забирает большую часть разницы между дешевым оптовым тарифом и розницей. "
+        f"Пассивный сброс дал бы {passive_amd:,.0f} AMD, пул начисляет {plan['seller_revenue_amd']:,.0f} AMD. "
         f"Чистая прибыль = {plan['seller_revenue_amd']:,.0f} − комиссия {plan['seller_success_fee_amd']:,.0f} "
         f"− закупка в накопитель {grid_charge_amd:,.0f} − износ {wear_amd:,.0f} AMD. "
         "Зеленым отмечены часы с наибольшим начислением."
@@ -628,8 +676,10 @@ def render_seller(plan: dict[str, Any]) -> None:
 def render_buyer(plan: dict[str, Any]) -> None:
     baseline = float(plan["buyer_baseline_cost_amd"])
     optimized = float(plan["buyer_optimized_cost_amd"])
-    savings = float(plan["buyer_savings_amd"])
-    savings_pct = 0.0 if baseline <= 1e-9 else 100.0 * savings / baseline
+    premium = optimized - baseline
+    premium_pct = 0.0 if baseline <= 1e-9 else 100.0 * premium / baseline
+    kpis = plan["kpis"]
+    peak_relief = max(0.0, float(kpis["baseline_max_grid_import_kw"]) - float(kpis["max_grid_import_kw"]))
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Потреблено объектом (кВт·ч)", f"{plan['buyer_total_consumed_kwh']:.1f}")
     c2.metric("Закрыто накопителем (кВт·ч)", f"{plan['buyer_covered_by_storage_kwh']:.1f}")
@@ -637,10 +687,15 @@ def render_buyer(plan: dict[str, Any]) -> None:
     c4.metric(
         "Итоговый счет к оплате с VoltSync (AMD)",
         f"{optimized:,.0f}",
-        f"{optimized - baseline:,.0f}",
-        delta_color="inverse",
+        f"+{premium:,.0f}",
+        delta_color="off",
     )
-    c5.metric("Экономия на вечернем пике (AMD)", f"{savings:,.0f}", f"{savings_pct:.0f}%")
+    c5.metric(
+        "Надбавка за снятие нагрузки сети (AMD)",
+        f"{premium:,.0f}",
+        f"+{premium_pct:.0f}% · пик −{peak_relief:.1f} кВт",
+        delta_color="off",
+    )
     direct_solar = max(
         0.0,
         float(plan["buyer_total_consumed_kwh"])
@@ -648,10 +703,10 @@ def render_buyer(plan: dict[str, Any]) -> None:
         - float(plan["buyer_grid_bought_kwh"]),
     )
     st.caption(
-        f"Без VoltSync весь объем покупается по тарифу сети. С VoltSync остаток "
-        f"{plan['buyer_grid_bought_kwh']:.1f} кВт·ч берется из сети, "
-        f"{direct_solar:.1f} кВт·ч закрывает прямое солнце, накопитель срезает дорогой пик. "
-        "Энергия пула считается по оптовой цене."
+        "Покупатель платит за энергию пула дороже розничного тарифа. Надбавка — плата за то, "
+        "что вечерний пик снимается с перегруженной сети и закрывается солнцем и накопителем. "
+        f"Из сети остается {plan['buyer_grid_bought_kwh']:.1f} кВт·ч, "
+        f"прямое солнце закрывает {direct_solar:.1f} кВт·ч, остальное дает батарея."
     )
     st.toggle(
         "Автоматический пик-шейвинг (Запрет потребления из сети при цене выше 50 AMD)",
@@ -668,7 +723,7 @@ def render_buyer(plan: dict[str, Any]) -> None:
             "Переключатель меняет диспетчеризацию, когда вечерняя продажа выгоднее собственного потребления "
             "(сценарий Evening export spike): нагрузка уходит с сети на накопитель."
         )
-    st.subheader("Стоимость закупки: до и после")
+    st.subheader("Счет по часам: тариф сети и поставка VoltSync")
     st.plotly_chart(
         chart_buyer_costs(plan["buyer_hourly_costs"], bool(plan.get("demand_response_active"))),
         width="stretch",
@@ -676,33 +731,86 @@ def render_buyer(plan: dict[str, Any]) -> None:
     )
 
 
-def render_plan(plan: dict[str, Any]) -> None:
-    if not _require_roles(plan):
-        return
-    title = html.escape(str(plan["scenario_title"]))
-    solver = html.escape(str(plan["solver"]))
+ROLES = ("dispatcher", "seller", "buyer")
+ROLE_COPY = {
+    "dispatcher": ("⚡ Диспетчер VPP", "Сеть и балансировка", "Общий обзор пула, баланс мощностей и команда оператора сети."),
+    "seller": ("☀️ Кабинет продавца", "Генерация и доход", "СЭС и накопитель. Продажа в пул по цене выше пассивного сброса."),
+    "buyer": ("🏢 Кабинет покупателя", "Потребление и нагрузка сети", "Коммерческое здание платит надбавку, а пик уходит с перегруженной сети."),
+}
+
+
+def _query_role() -> str | None:
+    raw = st.query_params.get("role")
+    if isinstance(raw, list):
+        raw = raw[0] if raw else None
+    if raw in ROLES:
+        return str(raw)
+    return None
+
+
+def ensure_role() -> str | None:
+    if "role" not in st.session_state:
+        st.session_state.role = _query_role()
+    role = st.session_state.get("role")
+    return role if role in ROLES else None
+
+
+def _enter(role: str) -> None:
+    st.session_state.role = role
+    st.query_params["role"] = role
+
+
+def _leave() -> None:
+    st.session_state.role = None
+    if "role" in st.query_params:
+        del st.query_params["role"]
+
+
+def render_entrance() -> None:
     st.markdown(
-        f"""
+        """
         <div class="vs-hero">
-          <div class="vs-kicker">VoltSync VPP · {title}</div>
-          <h1 class="vs-title">Диспетчер, продавец и покупатель</h1>
-          <p class="vs-sub">Один суточный план пула для трех кабинетов. Решено солвером {solver} за {plan["solve_time_ms"]:.0f} мс.</p>
+          <div class="vs-kicker">VoltSync VPP</div>
+          <h1 class="vs-title">Выберите вход</h1>
+          <p class="vs-sub">У диспетчера, продавца и покупателя отдельные кабинеты. День симуляции один, экраны не смешиваются.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    dispatcher, seller, buyer = st.tabs(
-        [
-            "⚡ Диспетчер VPP (Сеть)",
-            "☀️️ Кабинет Продавца (Генерация)",
-            "🏢 Кабинет Покупателя (Потребление)",
-        ]
+    columns = st.columns(3)
+    for column, role in zip(columns, ROLES, strict=True):
+        title, kicker, text = ROLE_COPY[role]
+        with column:
+            st.markdown(
+                f'<div class="vs-entry"><p class="vs-kicker">{html.escape(kicker)}</p>'
+                f"<h3>{html.escape(title)}</h3><p>{html.escape(text)}</p></div>",
+                unsafe_allow_html=True,
+            )
+            st.button(f"Войти · {title}", key=f"enter_{role}", on_click=_enter, args=(role,), type="primary")
+    st.caption("Прямые входы: `?role=dispatcher`, `?role=seller`, `?role=buyer`.")
+
+
+def render_role(role: str, plan: dict[str, Any]) -> None:
+    if not _require_roles(plan):
+        return
+    title = html.escape(str(plan["scenario_title"]))
+    solver = html.escape(str(plan["solver"]))
+    heading, kicker, _text = ROLE_COPY[role]
+    st.markdown(
+        f"""
+        <div class="vs-hero">
+          <div class="vs-kicker">{html.escape(kicker)} · {title}</div>
+          <h1 class="vs-title">{html.escape(heading)}</h1>
+          <p class="vs-sub">Решено солвером {solver} за {plan["solve_time_ms"]:.0f} мс.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    with dispatcher:
+    if role == "dispatcher":
         render_dispatcher(plan)
-    with seller:
+    elif role == "seller":
         render_seller(plan)
-    with buyer:
+    else:
         render_buyer(plan)
 
 
@@ -719,18 +827,25 @@ def main() -> None:
 
     solver_state = "CBC готов" if health.get("solver_available") else "CBC не найден"
     st.sidebar.success(f"{health.get('service')} {health.get('version')} · {solver_state}")
+    role = ensure_role()
+    if role is None:
+        render_entrance()
+        return
 
+    st.sidebar.button("Другой вход", on_click=_leave)
+    _restore_inputs()
     try:
         catalog = ensure_catalog(base_url)
         scenario_id = render_sidebar(catalog)
         plan = api_post(base_url, "/api/v1/plan", payload_from_state(scenario_id))
+        _remember_inputs()
     except ApiError as exc:
         st.error(str(exc))
         return
 
-    render_plan(plan)
+    render_role(role, plan)
     st.markdown(
-        '<p class="vs-note">VoltSync VPP · три роли одного пула · синтетический день Еревана</p>',
+        '<p class="vs-note">VoltSync VPP · отдельный вход для каждой роли · синтетический день Еревана</p>',
         unsafe_allow_html=True,
     )
 
