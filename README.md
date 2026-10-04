@@ -1,60 +1,60 @@
 # VoltSynch
 
-Солнечная энергия из домашних станций, проданная в тот час, когда она нужна сети.
+Solar energy from home stations, sold in the hour the grid needs it.
 
-Сайт: [voltsynch.world](https://voltsynch.world)
+Live site: [voltsynch.world](https://voltsynch.world)
 
-## Идея
+## Idea
 
-В полдень солнце даёт больше всего энергии, а сети она в это время не нужна. Поэтому сеть заранее объявляет часы, в которые покупает энергию. В остальные часы реле станции направляет выработку в батарею. Когда приём открывается, станция продаёт накопленное. VoltSynch организует продажу и берёт 10% от цены.
+Solar output peaks at noon, when the grid needs it least. So the grid announces in advance the hours in which it buys energy. In the other hours each station's relay sends its output to a battery. When buying opens, the station sells what it stored. VoltSynch arranges the sale and keeps 10% of the price.
 
-| Час | Цена за 1 кВт·ч |
+| Hour | Price per 1 kWh |
 | --- | --- |
-| Сеть не покупает | 0 драмов |
-| Обычный приём | около 25 драмов |
-| Пиковый приём | 26–50 драмов |
+| Grid not buying | 0 AMD |
+| Ordinary buying | about 25 AMD |
+| Peak buying | 26–50 AMD |
 
-Цены сценарные. Тариф КРОУ здесь не применяется.
+These prices are a scenario. The regulator's (PSRC) tariff is not applied here.
 
-## Три входа
+## Three entrances
 
-- **Электросеть** видит, сколько энергии не вошло в сеть в полдень и сколько батареи отдали на пике.
-- **Солнечная станция** видит продажи, доход и прибавку, которую дала батарея.
-- **Координатор** видит все 30 станций вместе и 10% сервиса.
+- **Power grid** sees how much energy stayed out of the grid at noon and how much the batteries delivered at the peak.
+- **Solar station** sees its sales, its income, and the extra amount the battery earned.
+- **Coordinator** sees all 30 stations together and the service's 10%.
 
 ## ML
 
-Модель `HistGradientBoostingRegressor` из scikit-learn прогнозирует почасовую выработку станции по погоде, излучению и параметрам панелей. По этому прогнозу сайт считает, успеет ли зарядиться батарея к часу продажи. Цену модель не задаёт.
+An ML model forecasts each station's hourly generation from weather, irradiance and panel parameters. From that forecast the site works out whether the battery will be charged by the selling hour. The model does not set prices.
 
-Обучение на 2024 годе, проверка на 2025-м. Средняя ошибка в светлые часы 0,074 кВт·ч против 0,205 кВт·ч у прогноза «тот же месяц, тот же час». На графиках «факт / прогноз» добавлен небольшой разброс для наглядности.
+It is trained on 2024 and tested on 2025. Mean daylight error is 0.074 kWh, against 0.205 kWh for a "same month, same hour" baseline. The actual-vs-forecast charts add a small spread for readability.
 
-## Данные
+## Data
 
-Данные синтетические: 30 станций (Ереван, Ширак, Лори, Гегаркуник, Сюник), 2024–2025 годы, почасово. Годовое потребление подогнано под открытую цифру 7,90 ТВт·ч за 2024 год. Почасовых данных оператора сети нет, и они не используются.
+All data is synthetic: 30 stations in Yerevan, Shirak, Lori, Gegharkunik and Syunik, hourly for 2024–2025. Annual consumption is scaled to the public figure of 7.90 TWh for 2024. No hourly data from the grid operator is used.
 
-## Запуск
+## Run
 
-Нужен Python 3.10 или 3.11.
+Requires Python 3.10 or 3.11.
 
 ```bash
 pip install -r requirements.txt
 python server.py
 ```
 
-Сайт откроется на http://127.0.0.1:8000, презентация на `/presentation`.
+The site opens at http://127.0.0.1:8000, the presentation at `/presentation`.
 
-Через Docker:
+With Docker:
 
 ```bash
 docker compose up --build -d
 ```
 
-Пересоздать данные можно командой `python generate_market_data.py`. Она перезапишет `data/` и удалит обученную модель. При следующем запуске сервер обучит модель заново.
+`python generate_market_data.py` regenerates the data. It overwrites `data/` and deletes the trained model, so the server retrains it on the next start.
 
-## Состав
+## Layout
 
-- `server.py` — API на FastAPI и ML-модель
-- `web/` — сайт и презентация
-- `data/` — синтетические данные
-- `generate_market_data.py` — генератор данных
-- `solar_exchange.ipynb` — ноутбук с данными и обучением
+- `server.py` — FastAPI API and the ML model
+- `web/` — site and presentation
+- `data/` — synthetic data
+- `generate_market_data.py` — data generator
+- `solar_exchange.ipynb` — notebook with the data and training
