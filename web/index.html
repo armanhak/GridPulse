@@ -7,117 +7,114 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700&family=Noto+Sans:wght@400;600&family=Noto+Serif+Armenian:wght@600&family=Noto+Serif:wght@600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=10">
+  <link rel="stylesheet" href="/static/styles.css?v=14">
 </head>
 <body>
-  <header>
-    <div class="brand">
+  <header class="app-header">
+    <a class="brand" href="/">
       <div class="mark">VOLTSYNCH</div>
       <div class="sub" data-i18n="sub">արևային էներգիայի բորսա</div>
-    </div>
-    <button type="button" id="back-gate" class="back" hidden data-i18n="nav.back">Բոլոր մուտքերը</button>
-    <nav>
+    </a>
+    <h1 id="role-title" class="role-title" hidden></h1>
+    <div class="header-actions">
+      <button type="button" id="back-gate" class="back" hidden data-i18n="nav.back">Բոլոր մուտքերը</button>
       <a class="nav-link" href="/presentation" data-i18n="nav.present">Ներկայացում</a>
-    </nav>
-    <div id="model-pill" class="pill" data-i18n="pill.loading">մոդելը բեռնվում է</div>
-    <div class="lang-switch" role="group" aria-label="Լեզու">
-      <button type="button" data-set-lang="hy" class="active">Հայ</button>
-      <button type="button" data-set-lang="en">EN</button>
+      <div class="lang-switch" role="group" aria-label="Լեզու">
+        <button type="button" data-set-lang="hy" class="active">Հայ</button>
+        <button type="button" data-set-lang="en">EN</button>
+      </div>
     </div>
   </header>
 
   <div id="workspace" class="filters" hidden>
+    <div class="period-block">
+      <p id="period-label" class="period"></p>
+      <div class="presets" id="presets"></div>
+    </div>
     <label><span data-i18n="filter.from">Սկսած</span>
       <input type="date" id="start" value="2025-04-01" min="2024-01-01" max="2025-12-31">
     </label>
     <label><span data-i18n="filter.to">Մինչև</span>
       <input type="date" id="end" value="2025-04-30" min="2024-01-01" max="2025-12-31">
     </label>
-    <label id="station-wrap"><span data-i18n="filter.station">Կայան</span>
-      <select id="station"></select>
-    </label>
-    <label><span data-i18n="filter.day">Կանխատեսման օր</span>
-      <input type="date" id="forecast-day" value="2025-04-15" min="2024-01-01" max="2025-12-31">
-    </label>
+    <div id="filter-station-home">
+      <label id="station-wrap"><span data-i18n="filter.station">Կայան</span>
+        <select id="station"></select>
+      </label>
+    </div>
   </div>
   <p id="error" class="error" hidden></p>
 
   <main>
     <section id="view-gate">
-      <p class="lede" data-i18n="gate.lede">Ընտրեք մուտքը։ Յուրաքանչյուր կողմ տեսնում է իր թվերը։</p>
+      <p class="lede" id="gate-lede" data-i18n="gate.lede">Ընտրեք կողմը։</p>
       <div class="gates">
         <button type="button" class="gate" data-enter="grid">
-          <strong data-i18n="gate.grid">Մուտք որպես էլեկտրացանց</strong>
-          <p data-i18n="gate.gridText">Որքան էներգիա մարտկոցները չեն թողել ցանց կեսօրին, և որքան են վերադարձրել այն ժամին, երբ ցանցը գնում է։</p>
+          <span class="gate-name" data-i18n="nav.grid">Էլեկտրացանց</span>
+          <p data-i18n="gate.gridText">Որքան էներգիա չի մտել ցանց, երբ այն պետք չէր, և որքան են վերադարձրել մարտկոցները պիկին։</p>
         </button>
         <button type="button" class="gate" data-enter="solar">
-          <strong data-i18n="gate.solar">Մուտք որպես արևային կայան</strong>
-          <p data-i18n="gate.solarText">Վաճառված էներգիան, եկամուտը միջնորդավճարից հետո և լրացուցիչ գումարը մարտկոցի շնորհիվ։</p>
+          <span class="gate-name" data-i18n="nav.solar">Արևային կայան</span>
+          <p data-i18n="gate.solarText">Վաճառքը, եկամուտը և լրացուցիչ գումարը մարտկոցից։</p>
         </button>
         <button type="button" class="gate" data-enter="exchange">
-          <strong data-i18n="gate.exchange">Մուտք որպես համակարգող</strong>
-          <p data-i18n="gate.exchangeText">Բոլոր կայանների արդյունքը, ծառայության 10%-ը և արտադրության կանխատեսման ճշտությունը։</p>
+          <span class="gate-name" data-i18n="nav.exchange">Համակարգող</span>
+          <p data-i18n="gate.exchangeText">Բոլոր կայանները միասին և ծառայության 10%-ը։</p>
         </button>
       </div>
     </section>
 
     <section id="view-solar" hidden>
-      <p class="lede" id="solar-lede"></p>
+      <p class="claim" id="solar-lede"></p>
       <div class="kpis">
-        <article class="card"><span data-i18n="s.sold">Վաճառվել է ցանցին</span><strong id="s-sold">—</strong></article>
-        <article class="card"><span data-i18n="s.revenue">Եկամուտ կայանի</span><strong id="s-revenue">—</strong></article>
-        <article class="card accent"><span data-i18n="s.extra">Լրացուցիչ՝ մարտկոցից</span><strong id="s-extra">—</strong><em id="s-extra-pct"></em></article>
-        <article class="card"><span data-i18n="s.delay">Մինչև վաճառք</span><strong id="s-peak">—</strong></article>
+        <article class="card accent hero"><span data-i18n="s.extra">Լրացուցիչ՝ մարտկոցից</span><strong id="s-extra">—</strong><em id="s-extra-pct"></em></article>
+        <article class="card hero"><span data-i18n="s.revenue">Եկամուտ կայանի</span><strong id="s-revenue">—</strong></article>
+        <article class="card quiet"><span data-i18n="s.sold">Վաճառվել է ցանցին</span><strong id="s-sold">—</strong></article>
+        <article class="card quiet"><span data-i18n="s.delay">Մինչև վաճառք</span><strong id="s-peak">—</strong></article>
       </div>
-      <article class="panel">
-        <h2 data-i18n="solar.dailyTitle">Վաճառք և լրացուցիչ եկամուտ ըստ օրվա</h2>
-        <p class="note" data-i18n="solar.dailyNote">Կանաչ սյունը՝ լրացուցիչ դրամը մարտկոցի շնորհիվ։ Դեղին գիծը՝ այդ օրը վաճառված էներգիան։</p>
-        <div class="chart-box tall"><canvas id="chart-solar-daily"></canvas></div>
-      </article>
-      <article class="panel">
-        <h2 data-i18n="ml.title">Ինչ է անում մոդելը</h2>
-        <ol class="steps">
-          <li data-i18n="ml.q">Պատասխանում է մեկ հարցի. քանի կիլովատ-ժամ կարտադրի կայանը մոտակա ժամերին։</li>
-          <li data-i18n="ml.use">Այդ թվով երևում է, արդյոք մարտկոցը կհասցնի լիցքավորվել մինչև վաճառքի ժամը։ Գրաֆիկում հոծ գիծը փաստն է, կետագիծը՝ կանխատեսումը։</li>
-        </ol>
-        <p class="note" id="ml-global"></p>
-      </article>
+      <p class="fine" data-i18n="price.note">Գումարները սցենարային գին են. ՀԾԿՀ սակագինը այստեղ չի կիրառվում։</p>
       <div class="split">
         <article class="panel">
-          <h2 data-i18n="solar.pvTitle">Արտադրության կանխատեսում</h2>
+          <div class="section-head">
+            <h2 data-i18n="solar.pvTitle">Արտադրության կանխատեսում</h2>
+            <div id="forecast-slot-solar"></div>
+          </div>
           <p class="note" id="solar-forecast-note"></p>
           <div class="chart-box"><canvas id="chart-solar-pv"></canvas></div>
         </article>
         <article class="panel">
           <h2 data-i18n="solar.battTitle">Մարտկոցից ցանց</h2>
-          <p class="note" data-i18n="solar.battNote">Կանաչը՝ ինչ մարտկոցն իրականում տվել է ցանց։ Կապույտը՝ ինչ մոդելն սպասել է կանխատեսված արտադրությունից և հայտարարված գնից։</p>
           <div class="chart-box"><canvas id="chart-solar-batt"></canvas></div>
         </article>
       </div>
+      <article class="panel">
+        <h2 data-i18n="solar.dailyTitle">Վաճառք և լրացուցիչ եկամուտ ըստ օրվա</h2>
+        <div class="chart-box tall"><canvas id="chart-solar-daily"></canvas></div>
+      </article>
     </section>
 
     <section id="view-grid" hidden>
-      <p class="lede" data-i18n="grid.lede">Երբ պահանջարկը հեռու է օրվա պիկից, ցանցը արևային էներգիա չի գնում։ Այն մնում է մարտկոցներում կամ կտրվում է։ Ընդունման ժամին կայանները վաճառում են անմիջապես։</p>
-      <div class="kpis">
-        <article class="card accent"><span data-i18n="g.refused">Չի ընդունվել, երբ պետք չէր</span><strong id="g-peak">—</strong></article>
-        <article class="card"><span data-i18n="g.battery">Եկել է մարտկոցներից</span><strong id="g-stored">—</strong></article>
-        <article class="card"><span data-i18n="g.bought">Գնվել է կայաններից</span><strong id="g-sold">—</strong></article>
-        <article class="card"><span data-i18n="g.delay">Մինչև վաճառք</span><strong id="g-share">—</strong></article>
+      <p class="claim" id="grid-lede"></p>
+      <div class="kpis three">
+        <article class="card accent hero"><span data-i18n="g.refused">Չի ընդունվել, երբ պետք չէր</span><strong id="g-peak">—</strong></article>
+        <article class="card hero"><span data-i18n="g.battery">Եկել է մարտկոցներից</span><strong id="g-stored">—</strong></article>
+        <article class="card quiet"><span data-i18n="g.bought">Գնվել է կայաններից</span><strong id="g-sold">—</strong></article>
       </div>
       <article class="panel">
         <h2 data-i18n="grid.hourTitle">Արևային էներգիան ցանցում, ըստ ժամի</h2>
-        <p class="note" id="grid-shift-note"></p>
-        <p class="note" data-i18n="grid.hourNote">Դեղին գիծը՝ որքան կմտներ ցանց ամեն ժամ, եթե մարտկոց չլիներ։ Կանաչ գիծը՝ որքան է իրականում մտել։ Կեսօրին կանաչը ցածր է. ավելցուկը մնացել է մարտկոցում, և ցանցը այդ ժամին չի ծանրաբեռնվել։ Երեկոյան կանաչը բարձր է. մարտկոցը այդ էներգիան տալիս է պիկի ժամին։</p>
         <div class="chart-box tall"><canvas id="chart-grid-hour"></canvas></div>
+        <p class="note caption" data-i18n="grid.hourNote">Դեղին շերտը կեսօրն է. ավելցուկը մնում է մարտկոցում։ Կանաչ շերտը պիկն է. մարտկոցը այդ էներգիան տալիս է ցանց։</p>
       </article>
       <div class="split">
         <article class="panel">
           <h2 data-i18n="grid.dailyTitle">Մարտկոցներից՝ ըստ օրվա</h2>
-          <p class="note" data-i18n="grid.dailyNote">Յուրաքանչյուր սյունը էներգիան է, որ մարտկոցները տվել են ցանց այն ժամերին, երբ ցանցը գնում էր։</p>
           <div class="chart-box"><canvas id="chart-grid-daily"></canvas></div>
         </article>
         <article class="panel">
-          <h2 data-i18n="grid.modelTitle">Ընտրված օրվա մոդել</h2>
+          <div class="section-head">
+            <h2 data-i18n="grid.modelTitle">Ընտրված օրվա մոդել</h2>
+            <div id="forecast-slot-grid"></div>
+          </div>
           <p class="note" id="grid-forecast-note"></p>
           <div class="chart-box"><canvas id="chart-grid-forecast"></canvas></div>
         </article>
@@ -125,39 +122,17 @@
     </section>
 
     <section id="view-exchange" hidden>
-      <p class="lede" data-i18n="exchange.lede">Այստեղ 30 կայանների ընդհանուր պատկերն է. վաճառք, եկամուտ, մարտկոցի լրացուցիչ գումարը և ծառայության 10%-ը։</p>
+      <p class="claim" id="exchange-lede"></p>
       <div class="kpis">
-        <article class="card"><span data-i18n="e.sold">Վաճառվել է ցանցին</span><strong id="e-sold">—</strong></article>
-        <article class="card"><span data-i18n="e.revenue">Բոլոր կայանների եկամուտ</span><strong id="e-revenue">—</strong></article>
-        <article class="card accent"><span data-i18n="e.extra">Լրացուցիչ՝ մարտկոցներից</span><strong id="e-extra">—</strong><em id="e-extra-pct"></em></article>
-        <article class="card"><span data-i18n="e.commission">Միջնորդավճար, 10%</span><strong id="e-peak">—</strong></article>
+        <article class="card accent hero"><span data-i18n="e.extra">Լրացուցիչ՝ մարտկոցներից</span><strong id="e-extra">—</strong><em id="e-extra-pct"></em></article>
+        <article class="card hero"><span data-i18n="e.commission">Միջնորդավճար, 10%</span><strong id="e-peak">—</strong></article>
+        <article class="card quiet"><span data-i18n="e.revenue">Բոլոր կայանների եկամուտ</span><strong id="e-revenue">—</strong></article>
+        <article class="card quiet"><span data-i18n="e.sold">Վաճառվել է ցանցին</span><strong id="e-sold">—</strong></article>
       </div>
-      <article class="panel">
-        <h2 data-i18n="exchange.dailyTitle">Բոլոր կայանները միասին, ըստ օրվա</h2>
-        <p class="note" data-i18n="exchange.dailyNote">Կանաչ սյունը՝ լրացուցիչ դրամը բոլոր կայաններից։ Դեղին գիծը՝ այդ օրը վաճառված էներգիան։</p>
-        <div class="chart-box tall"><canvas id="chart-exchange-daily"></canvas></div>
-      </article>
-      <article class="panel">
-        <h2 data-i18n="exchange.allTitle">Յուրաքանչյուր կայան</h2>
-        <p class="note" data-i18n="exchange.allNote">Սյունը կայանի վաճառքն է ընտրված ժամանակահատվածում։ Միասին սա ամբողջ ցանցն է։</p>
-        <div class="chart-box fleet"><canvas id="chart-all-stations"></canvas></div>
-      </article>
-      <article class="panel">
-        <h2 data-i18n="ml.title">Ինչ է անում մոդելը</h2>
-        <ol class="steps">
-          <li data-i18n="ml.q">Պատասխանում է մեկ հարցի. քանի կիլովատ-ժամ կարտադրի կայանը մոտակա ժամերին։</li>
-          <li data-i18n="ml.use">Այդ թվով երևում է, արդյոք մարտկոցը կհասցնի լիցքավորվել մինչև վաճառքի ժամը։ Գրաֆիկում հոծ գիծը փաստն է, կետագիծը՝ կանխատեսումը։</li>
-        </ol>
-        <p class="note" id="model-blurb"></p>
-        <ul class="facts" id="model-facts"></ul>
-      </article>
-      <article class="panel">
-        <h2 data-i18n="exchange.regionTitle">Լրացուցիչ եկամուտ ըստ մարզի</h2>
-        <div class="chart-box"><canvas id="chart-regions"></canvas></div>
-      </article>
+      <p class="fine" data-i18n="price.note">Գումարները սցենարային գին են. ՀԾԿՀ սակագինը այստեղ չի կիրառվում։</p>
       <article class="panel">
         <h2 data-i18n="exchange.stationsTitle">Կայաններ</h2>
-        <p class="note" data-i18n="exchange.tableNote">Սեղմեք տողի վրա, որպեսզի բացվի այդ կայանի կաբինետը։</p>
+        <p class="note" data-i18n="exchange.tableNote">Տողը բացում է այդ կայանի մուտքը։</p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -170,6 +145,7 @@
                 <th data-i18n="th.extra">Լրացուցիչ, դրամ</th>
                 <th data-i18n="th.pct">Լրացուցիչ %</th>
                 <th data-i18n="th.battery">Մարտկոցից, կՎտ·ժ</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="station-rows"></tbody>
@@ -177,13 +153,38 @@
         </div>
       </article>
       <article class="panel">
-        <h2 data-i18n="exchange.forecastTitle">Ընտրված կայանի կանխատեսում</h2>
+        <h2 data-i18n="exchange.regionTitle">Լրացուցիչ եկամուտ ըստ մարզի</h2>
+        <p class="note" data-i18n="exchange.regionNote">Լրացուցիչ դրամը՝ մեկ կՎտ վահանակի հաշվով, որպեսզի մարզերը համեմատելի լինեն։</p>
+        <div class="chart-box"><canvas id="chart-regions"></canvas></div>
+      </article>
+      <article class="panel">
+        <h2 data-i18n="exchange.dailyTitle">Բոլոր կայանները միասին, ըստ օրվա</h2>
+        <div class="chart-box tall"><canvas id="chart-exchange-daily"></canvas></div>
+      </article>
+      <article class="panel">
+        <div class="section-head">
+          <h2 data-i18n="exchange.forecastTitle">Ընտրված կայանի կանխատեսում</h2>
+          <div class="forecast-tools">
+            <div id="station-slot-exchange"></div>
+            <div id="forecast-slot-exchange"></div>
+          </div>
+        </div>
         <p class="note" id="exchange-forecast-note"></p>
         <div class="chart-box"><canvas id="chart-exchange-pv"></canvas></div>
       </article>
+      <article class="panel">
+        <h2 data-i18n="ml.title">Ինչ է անում մոդելը</h2>
+        <p class="note" id="model-blurb"></p>
+        <ul class="facts" id="model-facts"></ul>
+      </article>
     </section>
   </main>
+
+  <label id="forecast-wrap" hidden><span data-i18n="filter.day">Կանխատեսման օր</span>
+    <input type="date" id="forecast-day" value="2025-04-15" min="2024-01-01" max="2025-12-31">
+  </label>
+
   <script src="/static/chart.umd.min.js"></script>
-  <script src="/static/app.js?v=10"></script>
+  <script src="/static/app.js?v=14"></script>
 </body>
 </html>

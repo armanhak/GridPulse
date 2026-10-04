@@ -47,20 +47,24 @@ const COPY = {
     "nav.exchange": "Համակարգող",
     "nav.present": "Ներկայացում",
     "nav.back": "Բոլոր մուտքերը",
-    "gate.lede": "Ընտրեք մուտքը։ Յուրաքանչյուր կողմ տեսնում է իր թվերը։",
-    "gate.grid": "Մուտք որպես էլեկտրացանց",
-    "gate.gridText": "Որքան էներգիա մարտկոցները չեն թողել ցանց կեսօրին, և որքան են վերադարձրել այն ժամին, երբ ցանցը գնում է։",
-    "gate.solar": "Մուտք որպես արևային կայան",
-    "gate.solarText": "Վաճառված էներգիան, եկամուտը միջնորդավճարից հետո և լրացուցիչ գումարը մարտկոցի շնորհիվ։",
-    "gate.exchange": "Մուտք որպես համակարգող",
-    "gate.exchangeText": "Բոլոր կայանների արդյունքը, ծառայության 10%-ը և արտադրության կանխատեսման ճշտությունը։",
+    "gate.lede": "Ընտրեք կողմը։",
+    "gate.grid": "Էլեկտրացանց",
+    "gate.gridText": "Որքան էներգիա չի մտել ցանց, երբ այն պետք չէր, և որքան են վերադարձրել մարտկոցները պիկին։",
+    "gate.solar": "Արևային կայան",
+    "gate.solarText": "Վաճառքը, եկամուտը և լրացուցիչ գումարը մարտկոցից։",
+    "gate.exchange": "Համակարգող",
+    "gate.exchangeText": "Բոլոր կայանները միասին և ծառայության 10%-ը։",
+    "preset.april": "Ապրիլ 2025",
+    "preset.july": "Հուլիս 2025",
+    "preset.year": "2025",
+    "price.note": "Գումարները սցենարային գին են. ՀԾԿՀ սակագինը այստեղ չի կիրառվում։",
     "ml.title": "Ինչ է անում մոդելը",
     "ml.q": "Պատասխանում է մեկ հարցի. քանի կիլովատ-ժամ կարտադրի կայանը մոտակա ժամերին։",
     "ml.not": "Գինը չի դնում։ Գնման ժամն ու սակագինը հայտարարում է ցանցը։",
     "ml.use": "Այդ թվով երևում է, արդյոք մարտկոցը կհասցնի լիցքավորվել մինչև վաճառքի ժամը։ Գրաֆիկում հոծ գիծը փաստն է, կետագիծը՝ կանխատեսումը։",
     "ml.global": "2025 թվականի ստուգման վրա, որը մոդելը չի տեսել, լուսավոր ժամերին սխալը {mae} կՎտ·ժ է։ Առանց մոդելի նույն ամիսը և նույն ժամը սխալվում են {profile} կՎտ·ժ-ով։",
-    "pill.loading": "մոդելը բեռնվում է",
-    "pill.ready": "2025 թ. ստուգում · սխալ {mae} կՎտ·ժ",
+    "pill.loading": "",
+    "pill.ready": "",
     "filter.from": "Սկսած",
     "filter.to": "Մինչև",
     "filter.station": "Կայան",
@@ -69,7 +73,7 @@ const COPY = {
     "s.revenue": "Եկամուտ կայանի",
     "s.extra": "Լրացուցիչ՝ մարտկոցից",
     "s.delay": "Մինչև վաճառք",
-    "solar.lede": "{id}, {city}։ Վահանակը՝ {pv} կՎտ, մարտկոցը՝ {battery} կՎտ·ժ։ Եկամուտը ցույց է տրված միջնորդավճարից հետո։ Լրացուցիչ եկամուտն այն գումարն է, որ կայանը ստացել է մարտկոցի շնորհիվ։",
+    "solar.lede": "{id}, {city}։ Վահանակ՝ {pv} կՎտ, մարտկոց՝ {battery} կՎտ·ժ։ Լրացուցիչ եկամուտը մարտկոցից է։",
     "solar.extraPct": "{pct}՝ առանց մարտկոցի համեմատ",
     "solar.dailyTitle": "Վաճառք և լրացուցիչ եկամուտ ըստ օրվա",
     "solar.dailyNote": "Կանաչ սյունը՝ լրացուցիչ դրամը մարտկոցի շնորհիվ։ Դեղին գիծը՝ այդ օրը վաճառված էներգիան։",
@@ -92,13 +96,15 @@ const COPY = {
     "forecast.note": "Այս օրվա արդյունքը. սխալը {mae} կՎտ·ժ է։ Մարտկոցից ցանց սպասվել է {pred}, եղել է {actual}։ {train}",
     "forecast.seen": "Այս օրը եղել է ուսուցման մեջ։",
     "forecast.unseen": "Այս օրը մոդելը ուսուցման ժամանակ չի տեսել։",
-    "grid.lede": "Երբ պահանջարկը հեռու է օրվա պիկից, ցանցը արևային էներգիա չի գնում։ Այն մնում է մարտկոցներում կամ կտրվում է։ Ընդունման ժամին կայանները վաճառում են անմիջապես։",
+    "grid.lede": "{period}. Ժամը\u00a010:00–15:00 ցանց չի մտել {held}։ Ժամը\u00a017:00–21:00 մարտկոցները տվել են {eve}։",
+    "grid.markNoon": "12:00 · չի մտել {value}",
+    "grid.markEve": "18:00 · մարտկոցից {value}",
     "g.refused": "Չի ընդունվել, երբ պետք չէր",
     "g.battery": "Եկել է մարտկոցներից",
     "g.bought": "Գնվել է կայաններից",
     "g.delay": "Մինչև վաճառք",
     "grid.hourTitle": "Արևային էներգիան ցանցում, ըստ ժամի",
-    "grid.hourNote": "Դեղին գիծը՝ որքան կմտներ ցանց ամեն ժամ, եթե մարտկոց չլիներ։ Կանաչ գիծը՝ որքան է իրականում մտել։ Կեսօրին կանաչը ցածր է. ավելցուկը մնացել է մարտկոցում, և ցանցը այդ ժամին չի ծանրաբեռնվել։ Երեկոյան կանաչը բարձր է. մարտկոցը այդ էներգիան տալիս է պիկի ժամին։",
+    "grid.hourNote": "Դեղին շերտը կեսօրն է. ավելցուկը մնում է մարտկոցում։ Կանաչ շերտը պիկն է. մարտկոցը այդ էներգիան տալիս է ցանց։",
     "grid.shift": "Ժամը 10:00–15:00 առանց մարտկոցի կմտներ {would}։ Մարտկոցով ցանց չի մտել {held}։ Ժամը 17:00–21:00 մարտկոցները տվել են {eve}։",
     "chart.with": "Մարտկոցով մտել է ցանց",
     "chart.without": "Առանց մարտկոցի կմտներ ցանց",
@@ -111,7 +117,9 @@ const COPY = {
     "grid.modelNote": "Մոդելը կանխատեսում է արտադրությունը, ապա հաշվում է, թե որքան կգա մարտկոցներից։ Կանաչը փաստն է, կապույտը՝ կանխատեսումը։ Այս օրը սպասվել է {pred}, եղել է {actual}։ {train}",
     "forecast.seenShort": "Օրը եղել է ուսուցման մեջ։",
     "forecast.unseenShort": "Օրը ուսուցման մեջ չի եղել։",
-    "exchange.lede": "Այստեղ 30 կայանների ընդհանուր պատկերն է. վաճառք, եկամուտ, մարտկոցի լրացուցիչ գումարը և ծառայության 10%-ը։",
+    "exchange.lede": "{period}. 30 կայան միասին. լրացուցիչը մարտկոցներից՝ {extra}, ծառայության 10%-ը՝ {fee}։",
+    "exchange.regionNote": "Լրացուցիչ դրամը՝ մեկ կՎտ վահանակի հաշվով, որպեսզի մարզերը համեմատելի լինեն։",
+    "chart.perKw": "Լրացուցիչ, դրամ/կՎտ",
     "e.revenue": "Բոլոր կայանների եկամուտ",
     "e.extra": "Լրացուցիչ՝ մարտկոցներից",
     "exchange.dailyTitle": "Բոլոր կայանները միասին, ըստ օրվա",
@@ -125,13 +133,13 @@ const COPY = {
     "e.maeNote": "առանց մոդելի սխալը՝ {profile} կՎտ·ժ, մոդելն ավելի ճշգրիտ է {lift}%-ով",
     "exchange.regionTitle": "Լրացուցիչ եկամուտ ըստ մարզի",
     "exchange.modelTitle": "Ինչպես է աշխատում մոդելը",
-    "exchange.modelBlurb": "Մոդելը կանխատեսում է արտադրությունն ըստ եղանակի և վահանակի։ Գինը չի որոշում։ Ուսուցումը՝ մինչև {trainEnd}, ստուգումը՝ {testYear} թվականը։",
+    "exchange.modelBlurb": "Մոդելը կանխատեսում է արտադրությունն ըստ եղանակի և վահանակի։ Ուսուցումը՝ մինչև {trainEnd}, ստուգումը՝ {testYear} թվականը։",
     "fact.train": "Ուսուցման ժամեր՝ {n}",
     "fact.test": "Ստուգման ժամեր՝ {n}",
     "fact.features": "Տվյալներ՝ ժամ, ամիս, տարվա օր, ջերմաստիճան, ամպամածություն, հզորություն, թեքություն, ազիմուտ, վահանակի գործակից, GHI, DNI, DHI",
     "fact.commission": "10% միջնորդավճարը հաշվվում է ցանցի վճարումից։ Արտադրության կանխատեսման մեջ այն չկա։",
     "exchange.stationsTitle": "Կայաններ",
-    "exchange.tableNote": "Սեղմեք տողի վրա, որպեսզի բացվի այդ կայանի կաբինետը։",
+    "exchange.tableNote": "Տողը բացում է այդ կայանի մուտքը։",
     "th.station": "Կայան",
     "th.region": "Մարզ",
     "th.kw": "կՎտ",
@@ -160,20 +168,24 @@ const COPY = {
     "nav.exchange": "Coordinator",
     "nav.present": "Overview",
     "nav.back": "All entrances",
-    "gate.lede": "Choose an entrance. Each side sees its own numbers.",
-    "gate.grid": "Enter as the power grid",
-    "gate.gridText": "How much energy the batteries kept out of the grid at noon, and how much they returned when the grid was buying.",
-    "gate.solar": "Enter as a solar station",
-    "gate.solarText": "Energy sold, income after the commission, and the extra amount earned because of the battery.",
-    "gate.exchange": "Enter as the coordinator",
-    "gate.exchangeText": "The result of every station, the service’s 10%, and how accurate the generation forecast is.",
+    "gate.lede": "Choose a side.",
+    "gate.grid": "Power grid",
+    "gate.gridText": "How much energy stayed out when it was not needed, and how much the batteries returned at the peak.",
+    "gate.solar": "Solar station",
+    "gate.solarText": "Sales, income, and the extra amount from the battery.",
+    "gate.exchange": "Coordinator",
+    "gate.exchangeText": "All stations together, and the service’s 10%.",
+    "preset.april": "April 2025",
+    "preset.july": "July 2025",
+    "preset.year": "2025",
+    "price.note": "These amounts use a scenario price. The regulator’s tariff is not applied here.",
     "ml.title": "What the model does",
     "ml.q": "It answers one question: how many kilowatt-hours this station will produce in the coming hours.",
     "ml.not": "It does not set the price. The grid publishes the hours it buys and the tariff.",
     "ml.use": "That forecast shows whether the battery will be charged in time for the sale. On the chart the solid line is what happened, the dashed line is the forecast.",
     "ml.global": "On the 2025 check, which the model had not seen, the daylight error is {mae} kWh. Without the model, the same month and the same hour miss by {profile} kWh.",
-    "pill.loading": "model is loading",
-    "pill.ready": "2025 check · error {mae} kWh",
+    "pill.loading": "",
+    "pill.ready": "",
     "filter.from": "From",
     "filter.to": "to",
     "filter.station": "Station",
@@ -182,7 +194,7 @@ const COPY = {
     "s.revenue": "Station income",
     "s.extra": "Extra from the battery",
     "s.delay": "Until the sale",
-    "solar.lede": "{id}, {city}. Panel {pv} kW, battery {battery} kWh. Income is shown after the commission. Extra income is the amount the station earned because of the battery.",
+    "solar.lede": "{id}, {city}. Panel {pv} kW, battery {battery} kWh. The extra income comes from the battery.",
     "solar.extraPct": "{pct} compared with selling without a battery",
     "solar.dailyTitle": "Sales and extra income by day",
     "solar.dailyNote": "The green bar is the extra dram earned because of the battery. The yellow line is the energy sold that day.",
@@ -205,13 +217,15 @@ const COPY = {
     "forecast.note": "This day’s result: the error is {mae} kWh. From the battery the model expected {pred}; the actual delivery was {actual}. {train}",
     "forecast.seen": "This day was part of training.",
     "forecast.unseen": "The model had not seen this day during training.",
-    "grid.lede": "When demand is far from the day’s peak, the grid does not buy solar energy. It stays in the batteries or is curtailed. In a buying hour the stations sell at once.",
+    "grid.lede": "{period}. From 10:00 to 15:00, {held} stayed out of the grid. From 17:00 to 21:00 the batteries delivered {eve}.",
+    "grid.markNoon": "12:00 · kept out {value}",
+    "grid.markEve": "18:00 · from batteries {value}",
     "g.refused": "Kept out when not needed",
     "g.battery": "Delivered from batteries",
     "g.bought": "Bought from stations",
     "g.delay": "Until the sale",
     "grid.hourTitle": "Solar energy in the grid, by hour",
-    "grid.hourNote": "The yellow line is how much would enter the grid each hour with no battery. The green line is how much actually entered. At noon the green line is lower: the surplus stayed in the batteries and did not load the grid. In the evening the green line is higher: the batteries deliver that energy at the peak.",
+    "grid.hourNote": "The yellow band is midday: the surplus stays in the batteries. The green band is the peak: the batteries deliver that energy to the grid.",
     "grid.shift": "From 10:00 to 15:00, {would} would have entered without batteries. With batteries, {held} stayed out. From 17:00 to 21:00 the batteries delivered {eve}.",
     "chart.with": "Entered with batteries",
     "chart.without": "Would enter with no battery",
@@ -224,7 +238,9 @@ const COPY = {
     "grid.modelNote": "The model forecasts generation, then calculates how much will come from the batteries. Green is what happened, blue is the forecast. This day it expected {pred}; the actual delivery was {actual}. {train}",
     "forecast.seenShort": "The day was part of training.",
     "forecast.unseenShort": "The day was not part of training.",
-    "exchange.lede": "This is the picture of all 30 stations: energy sold, income, the extra amount from the batteries, and the service’s 10%.",
+    "exchange.lede": "{period}. All 30 stations. Extra from the batteries: {extra}. The service’s 10%: {fee}.",
+    "exchange.regionNote": "Extra dram per kilowatt of panel, so the regions can be compared.",
+    "chart.perKw": "Extra, dram/kW",
     "e.revenue": "Income of all stations",
     "e.extra": "Extra from the batteries",
     "exchange.dailyTitle": "All stations together, by day",
@@ -238,13 +254,13 @@ const COPY = {
     "e.maeNote": "without the model the error is {profile} kWh; the model is {lift}% more accurate",
     "exchange.regionTitle": "Extra income by region",
     "exchange.modelTitle": "What the model does",
-    "exchange.modelBlurb": "The model forecasts generation from the weather and the panel. It does not set the price. Training runs through {trainEnd}; the check is {testYear}.",
+    "exchange.modelBlurb": "The model forecasts generation from the weather and the panel. Training runs through {trainEnd}; the check is {testYear}.",
     "fact.train": "Hours in training: {n}",
     "fact.test": "Hours in the check: {n}",
     "fact.features": "Inputs: hour, month, day of year, temperature, cloud cover, power, tilt, azimuth, panel factor, GHI, DNI, DHI",
     "fact.commission": "The 10% commission is taken from what the grid pays. It is not part of the generation forecast.",
     "exchange.stationsTitle": "Stations",
-    "exchange.tableNote": "Click a row to open that station’s entrance.",
+    "exchange.tableNote": "A row opens that station’s entrance.",
     "th.station": "Station",
     "th.region": "Region",
     "th.kw": "kW",
@@ -347,8 +363,9 @@ function applyStatic() {
   document.documentElement.lang = lang;
   document.title = t("docTitle");
   document.querySelectorAll("[data-i18n]").forEach((node) => {
-    if (node.id === "model-pill" && metrics) return;
-    node.textContent = t(node.dataset.i18n);
+    const text = t(node.dataset.i18n);
+    if (text.includes("{")) return;
+    node.textContent = text;
   });
   document.querySelectorAll("[data-set-lang]").forEach((button) => {
     const on = button.dataset.setLang === lang;
@@ -359,18 +376,64 @@ function applyStatic() {
 }
 
 function renderPill() {
-  const node = document.getElementById("model-pill");
-  if (!metrics) {
-    node.textContent = t("pill.loading");
-    return;
-  }
-  node.textContent = fill("pill.ready", { mae: num(metrics.mae_daylight, 3) });
+  if (!metrics) return;
   const accuracy = fill("ml.global", {
     mae: num(metrics.mae_daylight, 3),
     profile: num(metrics.mae_profile, 3),
   });
-  const globalNote = document.getElementById("ml-global");
-  if (globalNote) globalNote.textContent = accuracy;
+  const globalNote = document.getElementById("model-blurb");
+  if (globalNote && state.role !== "exchange") globalNote.textContent = accuracy;
+}
+
+const MONTHS = {
+  hy: ["հունվարի", "փետրվարի", "մարտի", "ապրիլի", "մայիսի", "հունիսի", "հուլիսի", "\u0585\u0563\u0578\u057d\u057f\u0578\u057d\u056b", "սեպտեմբերի", "հոկտեմբերի", "նոյեմբերի", "դեկտեմբերի"],
+  en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+};
+
+const PRESETS = [
+  ["2025-04-01", "2025-04-30", "preset.april"],
+  ["2025-07-01", "2025-07-31", "preset.july"],
+  ["2025-01-01", "2025-12-31", "preset.year"],
+];
+
+function formatPeriod(start, end) {
+  const [ys, ms, ds] = start.split("-").map(Number);
+  const [ye, me, de] = end.split("-").map(Number);
+  const months = MONTHS[lang] || MONTHS.hy;
+  if (ys === ye && ms === me) {
+    return lang === "en"
+      ? `${months[ms - 1]} ${ds}–${de}, ${ys}`
+      : `${ds}–${de} ${months[ms - 1]} ${ys}`;
+  }
+  if (ys === ye) {
+    return lang === "en"
+      ? `${months[ms - 1]} ${ds} – ${months[me - 1]} ${de}, ${ys}`
+      : `${ds} ${months[ms - 1]} – ${de} ${months[me - 1]} ${ys}`;
+  }
+  return `${start} – ${end}`;
+}
+
+function renderPresets() {
+  const host = document.getElementById("presets");
+  host.innerHTML = PRESETS.map(([start, end, key]) => {
+    const on = state.start === start && state.end === end;
+    return `<button type="button" data-range="${start}|${end}" class="${on ? "active" : ""}">${t(key)}</button>`;
+  }).join("");
+  host.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const [start, end] = button.dataset.range.split("|");
+      state.start = start;
+      state.end = end;
+      document.getElementById("start").value = start;
+      document.getElementById("end").value = end;
+      if (state.day < start || state.day > end) {
+        state.day = start;
+        document.getElementById("forecast-day").value = start;
+      }
+      setChrome();
+      loadRole();
+    });
+  });
 }
 
 function fillStations() {
@@ -404,25 +467,81 @@ async function getJson(url) {
 function putChart(id, config) {
   if (charts[id]) charts[id].destroy();
   const user = config.options || {};
-  const userLegend = (user.plugins && user.plugins.legend) || {};
+  const userPlugins = user.plugins || {};
   charts[id] = new Chart(document.getElementById(id), {
     type: config.type,
     data: config.data,
+    plugins: config.plugins || [],
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
       indexAxis: user.indexAxis,
+      layout: user.layout,
       plugins: {
+        ...userPlugins,
         legend: {
           labels: { color: ink, boxWidth: 12, font: { size: 12, family: fontFamily } },
-          ...userLegend,
+          ...(userPlugins.legend || {}),
         },
       },
       scales: user.scales,
     },
   });
 }
+
+const shiftMarks = {
+  id: "shiftMarks",
+  beforeDatasetsDraw(chart) {
+    const opts = chart.options.plugins && chart.options.plugins.shiftMarks;
+    if (!opts || !chart.chartArea) return;
+    const { ctx, chartArea, scales } = chart;
+    const points = chart.getDatasetMeta(0).data;
+    if (!points.length) return;
+    const step = points[1].x - points[0].x;
+    ctx.save();
+    opts.bands.forEach((band) => {
+      if (band.from < 0 || band.to < 0 || !points[band.from] || !points[band.to]) return;
+      const left = points[band.from].x - step / 2;
+      const right = points[band.to].x + step / 2;
+      ctx.fillStyle = band.color;
+      ctx.fillRect(left, chartArea.top, Math.max(0, right - left), chartArea.bottom - chartArea.top);
+    });
+    ctx.restore();
+  },
+  afterDatasetsDraw(chart) {
+    const opts = chart.options.plugins && chart.options.plugins.shiftMarks;
+    if (!opts || !chart.chartArea) return;
+    const { ctx, chartArea, scales } = chart;
+    ctx.save();
+    ctx.font = `600 12px ${fontFamily}`;
+    ctx.textBaseline = "middle";
+    opts.marks.forEach((mark) => {
+      if (mark.index < 0) return;
+      const point = chart.getDatasetMeta(0).data[mark.index];
+      if (!point) return;
+      const values = chart.data.datasets.map((series) => Number(series.data[mark.index]) || 0);
+      const y = scales.y.getPixelForValue(Math.max(...values));
+      const width = ctx.measureText(mark.text).width;
+      const boxW = width + 12;
+      const boxH = 22;
+      let left = point.x - boxW / 2;
+      left = Math.max(chartArea.left, Math.min(left, chartArea.right - boxW));
+      const top = Math.max(chartArea.top + 4, y - boxH - 8);
+      ctx.fillStyle = "#fffaf2";
+      ctx.strokeStyle = mark.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(left, top, boxW, boxH, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = mark.color;
+      ctx.textAlign = "left";
+      ctx.fillText(mark.text, left + 6, top + boxH / 2);
+    });
+    ctx.restore();
+  },
+};
 
 function axis(title) {
   return {
@@ -434,6 +553,40 @@ function axis(title) {
   };
 }
 
+function placeControls() {
+  const day = document.getElementById("forecast-wrap");
+  const station = document.getElementById("station-wrap");
+  const daySlot = document.getElementById(`forecast-slot-${state.role}`);
+  if (daySlot) {
+    daySlot.appendChild(day);
+    day.hidden = false;
+  } else {
+    day.hidden = true;
+  }
+  const stationHome = state.role === "exchange"
+    ? document.getElementById("station-slot-exchange")
+    : document.getElementById("filter-station-home");
+  stationHome.appendChild(station);
+  station.hidden = state.role === "grid" || state.role === "gate";
+}
+
+function setChrome() {
+  const title = document.getElementById("role-title");
+  const period = document.getElementById("period-label");
+  placeControls();
+  renderPresets();
+  if (state.role === "gate") {
+    title.hidden = true;
+    document.title = t("docTitle");
+    return;
+  }
+  const name = t(state.role === "grid" ? "nav.grid" : state.role === "solar" ? "nav.solar" : "nav.exchange");
+  title.hidden = false;
+  title.textContent = name;
+  period.textContent = formatPeriod(state.start, state.end);
+  document.title = `VoltSynch — ${name}`;
+}
+
 function showGate() {
   state.role = "gate";
   document.getElementById("view-gate").hidden = false;
@@ -442,6 +595,7 @@ function showGate() {
   document.getElementById("view-exchange").hidden = true;
   document.getElementById("workspace").hidden = true;
   document.getElementById("back-gate").hidden = true;
+  setChrome();
 }
 
 function enterRole(role) {
@@ -452,7 +606,7 @@ function enterRole(role) {
   document.getElementById("view-exchange").hidden = role !== "exchange";
   document.getElementById("workspace").hidden = false;
   document.getElementById("back-gate").hidden = false;
-  document.getElementById("station-wrap").hidden = role === "grid";
+  setChrome();
   loadRole();
 }
 
@@ -461,6 +615,7 @@ function setLang(next) {
   try { localStorage.setItem("voltsynch-lang", lang); } catch (_err) { /* ignore */ }
   applyStatic();
   if (stations.length) fillStations();
+  setChrome();
   if (state.role !== "gate") loadRole();
 }
 
@@ -550,21 +705,26 @@ async function loadGrid() {
   document.getElementById("g-peak").textContent = formatEnergy(data.refused_kwh);
   document.getElementById("g-stored").textContent = formatEnergy(data.battery_peak_kwh);
   document.getElementById("g-sold").textContent = formatEnergy(data.sold_kwh);
-  document.getElementById("g-share").textContent = formatHours(data.sale_delay_h);
 
   const noon = data.hourly.filter((row) => row.hour >= 10 && row.hour <= 15);
   const evening = data.hourly.filter((row) => row.hour >= 17 && row.hour <= 21);
   const sumOf = (rows, key) => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
   const would = sumOf(noon, "immediate_kwh");
   const noonSold = sumOf(noon, "sold_kwh");
-  document.getElementById("grid-shift-note").textContent = fill("grid.shift", {
-    would: formatEnergy(would),
+  document.getElementById("grid-lede").textContent = fill("grid.lede", {
+    period: formatPeriod(state.start, state.end),
     held: formatEnergy(Math.max(0, would - noonSold)),
     eve: formatEnergy(sumOf(evening, "battery_kwh")),
   });
 
+  const at = (hour) => data.hourly.findIndex((row) => row.hour === hour);
+  const noonRow = data.hourly.find((row) => row.hour === 12) || { immediate_kwh: 0, sold_kwh: 0 };
+  const eveRow = data.hourly.find((row) => row.hour === 18) || { battery_kwh: 0 };
+  const marked = new Set([12, 18]);
+
   putChart("chart-grid-hour", {
     type: "line",
+    plugins: [shiftMarks],
     data: {
       labels: data.hourly.map((row) => String(row.hour).padStart(2, "0")),
       datasets: [
@@ -574,7 +734,7 @@ async function loadGrid() {
           borderColor: sun,
           backgroundColor: "rgba(227,155,43,0.14)",
           fill: true,
-          pointRadius: 0,
+          pointRadius: data.hourly.map((row) => (marked.has(row.hour) ? 4 : 0)),
           borderWidth: 2,
           tension: 0.35,
         },
@@ -583,13 +743,36 @@ async function loadGrid() {
           data: data.hourly.map((row) => row.sold_kwh),
           borderColor: leaf,
           backgroundColor: leaf,
-          pointRadius: 0,
+          pointRadius: data.hourly.map((row) => (marked.has(row.hour) ? 4 : 0)),
           borderWidth: 2.5,
           tension: 0.35,
         },
       ],
     },
-    options: { scales: { x: axis(t("unit.hour")), y: axis(t("unit.kwhPeriod")) } },
+    options: {
+      layout: { padding: { top: 8 } },
+      plugins: {
+        shiftMarks: {
+          bands: [
+            { from: at(10), to: at(15), color: "rgba(227,155,43,0.14)" },
+            { from: at(17), to: at(21), color: "rgba(31,107,74,0.12)" },
+          ],
+          marks: [
+            {
+              index: at(12),
+              color: sun,
+              text: fill("grid.markNoon", { value: formatEnergy(Math.max(0, noonRow.immediate_kwh - noonRow.sold_kwh)) }),
+            },
+            {
+              index: at(18),
+              color: leaf,
+              text: fill("grid.markEve", { value: formatEnergy(eveRow.battery_kwh) }),
+            },
+          ],
+        },
+      },
+      scales: { x: axis(t("unit.hour")), y: axis(t("unit.kwhPeriod")) },
+    },
   });
 
   putChart("chart-grid-daily", {
@@ -628,6 +811,11 @@ async function loadExchange() {
   document.getElementById("e-peak").textContent = formatAmd(data.commission_amd);
   document.getElementById("e-sold").textContent = formatEnergy(data.sold_kwh);
   document.getElementById("e-revenue").textContent = formatAmd(data.revenue_amd);
+  document.getElementById("exchange-lede").textContent = fill("exchange.lede", {
+    period: formatPeriod(state.start, state.end),
+    extra: formatAmd(data.extra_amd),
+    fee: formatAmd(data.commission_amd),
+  });
   const model = data.metrics;
   document.getElementById("model-blurb").textContent = fill("ml.global", {
     mae: num(model.mae_daylight, 3),
@@ -658,30 +846,19 @@ async function loadExchange() {
     },
   });
 
-  const fleet = [...data.stations].sort((a, b) => b.sold_kwh - a.sold_kwh);
-  putChart("chart-all-stations", {
-    type: "bar",
-    data: {
-      labels: fleet.map((row) => row.id),
-      datasets: [{ label: t("chart.sold"), data: fleet.map((row) => row.sold_kwh), backgroundColor: leaf }],
-    },
-    options: {
-      indexAxis: "y",
-      plugins: { legend: { display: false } },
-      scales: { x: axis(t("unit.kwh")), y: axis() },
-    },
-  });
-
+  const regions = [...data.regions]
+    .map((row) => ({ ...row, perKw: row.pv_kw ? row.extra_amd / row.pv_kw : 0 }))
+    .sort((a, b) => b.perKw - a.perKw);
   putChart("chart-regions", {
     type: "bar",
     data: {
-      labels: data.regions.map((row) => place(row.region)),
-      datasets: [{ label: t("chart.extra"), data: data.regions.map((row) => row.extra_amd), backgroundColor: leaf }],
+      labels: regions.map((row) => place(row.region)),
+      datasets: [{ label: t("chart.perKw"), data: regions.map((row) => Math.round(row.perKw)), backgroundColor: leaf }],
     },
     options: {
       indexAxis: "y",
       plugins: { legend: { display: false } },
-      scales: { x: axis(t("unit.dram")), y: axis() },
+      scales: { x: axis(t("chart.perKw")), y: axis() },
     },
   });
 
@@ -696,6 +873,7 @@ async function loadExchange() {
       <td>${num(Math.round(data.extra_amd), 0)}</td>
       <td>${formatPct(data.extra_pct)}</td>
       <td>${num(data.battery_peak_kwh, 1)}</td>
+      <td></td>
     </tr>`;
   body.innerHTML = totalRow + data.stations.map((row) => `
     <tr data-station="${row.id}">
@@ -707,6 +885,7 @@ async function loadExchange() {
       <td>${num(Math.round(row.extra_amd), 0)}</td>
       <td>${formatPct(row.extra_pct)}</td>
       <td>${num(row.battery_peak_kwh, 1)}</td>
+      <td class="open-hint" aria-hidden="true">→</td>
     </tr>
   `).join("");
   body.querySelectorAll("tr[data-station]").forEach((row) => {
@@ -741,10 +920,11 @@ async function boot() {
   document.querySelectorAll("[data-set-lang]").forEach((button) => {
     button.addEventListener("click", () => setLang(button.dataset.setLang));
   });
-  document.querySelectorAll(".filters input, .filters select").forEach((node) => {
+  document.querySelectorAll("#start, #end, #station, #forecast-day").forEach((node) => {
     node.addEventListener("change", () => {
       readFilters();
-      loadRole();
+      setChrome();
+      if (state.role !== "gate") loadRole();
     });
   });
   showGate();
