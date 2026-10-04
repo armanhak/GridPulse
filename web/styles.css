@@ -192,6 +192,10 @@ main { padding: 18px 28px 40px; }
 
 .chart-box { position: relative; height: 260px; }
 .chart-box.tall { height: 320px; }
+.chart-box.fleet { height: 720px; }
+
+tbody tr.total { cursor: default; font-weight: 650; }
+tbody tr.total:hover { background: transparent; }
 
 .split {
   display: grid;

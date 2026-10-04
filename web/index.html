@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700&family=Noto+Sans:wght@400;600&family=Noto+Serif+Armenian:wght@600&family=Noto+Serif:wght@600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=9">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
 </head>
 <body>
   <header>
@@ -55,7 +55,7 @@
           <p data-i18n="gate.solarText">Վաճառված էներգիան, եկամուտը միջնորդավճարից հետո և լրացուցիչ գումարը մարտկոցի շնորհիվ։</p>
         </button>
         <button type="button" class="gate" data-enter="exchange">
-          <strong data-i18n="gate.exchange">Մուտք որպես բորսա</strong>
+          <strong data-i18n="gate.exchange">Մուտք որպես համակարգող</strong>
           <p data-i18n="gate.exchangeText">Բոլոր կայանների արդյունքը, ծառայության 10%-ը և արտադրության կանխատեսման ճշտությունը։</p>
         </button>
       </div>
@@ -78,7 +78,6 @@
         <h2 data-i18n="ml.title">Ինչ է անում մոդելը</h2>
         <ol class="steps">
           <li data-i18n="ml.q">Պատասխանում է մեկ հարցի. քանի կիլովատ-ժամ կարտադրի կայանը մոտակա ժամերին։</li>
-          <li data-i18n="ml.not">Գինը չի դնում։ Գնման ժամն ու սակագինը հայտարարում է ցանցը։</li>
           <li data-i18n="ml.use">Այդ թվով երևում է, արդյոք մարտկոցը կհասցնի լիցքավորվել մինչև վաճառքի ժամը։ Գրաֆիկում հոծ գիծը փաստն է, կետագիծը՝ կանխատեսումը։</li>
         </ol>
         <p class="note" id="ml-global"></p>
@@ -98,7 +97,7 @@
     </section>
 
     <section id="view-grid" hidden>
-      <p class="lede" data-i18n="grid.lede">Երբ պահանջարկը հեռու է օրվա գագաթից, ցանցը արևային էներգիա չի գնում։ Այն մնում է մարտկոցներում կամ կտրվում է։ Ընդունման ժամին կայանները վաճառում են անմիջապես։</p>
+      <p class="lede" data-i18n="grid.lede">Երբ պահանջարկը հեռու է օրվա պիկից, ցանցը արևային էներգիա չի գնում։ Այն մնում է մարտկոցներում կամ կտրվում է։ Ընդունման ժամին կայանները վաճառում են անմիջապես։</p>
       <div class="kpis">
         <article class="card accent"><span data-i18n="g.refused">Չի ընդունվել, երբ պետք չէր</span><strong id="g-peak">—</strong></article>
         <article class="card"><span data-i18n="g.battery">Եկել է մարտկոցներից</span><strong id="g-stored">—</strong></article>
@@ -106,9 +105,9 @@
         <article class="card"><span data-i18n="g.delay">Մինչև վաճառք</span><strong id="g-share">—</strong></article>
       </div>
       <article class="panel">
-        <h2 data-i18n="grid.hourTitle">Ինչպես են մարտկոցները թեթևացնում ցանցը</h2>
+        <h2 data-i18n="grid.hourTitle">Արևային էներգիան ցանցում, ըստ ժամի</h2>
         <p class="note" id="grid-shift-note"></p>
-        <p class="note" data-i18n="grid.hourNote">Դեղին սյունը՝ ինչ կլցվեր ցանց, եթե մարտկոց չլիներ. գագաթը կեսօրին է։ Կանաչ սյունը՝ ինչ իրականում է մտել։ Մուգ մասը մարտկոցից է։ Կեսօրին կանաչը դեղինից ցածր է. այդ էներգիան ցանց չի ծանրաբեռնել, մնացել է մարտկոցում։ Երեկոյան մուգ մասը գալիս է այն ժամին, երբ ցանցը գնում է։</p>
+        <p class="note" data-i18n="grid.hourNote">Դեղին գիծը՝ որքան կմտներ ցանց ամեն ժամ, եթե մարտկոց չլիներ։ Կանաչ գիծը՝ որքան է իրականում մտել։ Կեսօրին կանաչը ցածր է. ավելցուկը մնացել է մարտկոցում, և ցանցը այդ ժամին չի ծանրաբեռնվել։ Երեկոյան կանաչը բարձր է. մարտկոցը այդ էներգիան տալիս է պիկի ժամին։</p>
         <div class="chart-box tall"><canvas id="chart-grid-hour"></canvas></div>
       </article>
       <div class="split">
@@ -126,18 +125,27 @@
     </section>
 
     <section id="view-exchange" hidden>
-      <p class="lede" data-i18n="exchange.lede">Այստեղ երևում են կայանների լրացուցիչ եկամուտը, ծառայության 10% միջնորդավճարը և այն, թե որքան ճշգրիտ է արտադրության կանխատեսումը։</p>
+      <p class="lede" data-i18n="exchange.lede">Այստեղ 30 կայանների ընդհանուր պատկերն է. վաճառք, եկամուտ, մարտկոցի լրացուցիչ գումարը և ծառայության 10%-ը։</p>
       <div class="kpis">
-        <article class="card accent"><span data-i18n="e.extra">Բոլոր կայանների լրացուցիչ եկամուտ</span><strong id="e-extra">—</strong><em id="e-extra-pct"></em></article>
-        <article class="card"><span data-i18n="e.commission">Միջնորդավճար, 10%</span><strong id="e-peak">—</strong></article>
         <article class="card"><span data-i18n="e.sold">Վաճառվել է ցանցին</span><strong id="e-sold">—</strong></article>
-        <article class="card"><span data-i18n="e.mae">Մոդելի սխալ, ժամը 7–18</span><strong id="e-mae">—</strong><em id="e-mae-note"></em></article>
+        <article class="card"><span data-i18n="e.revenue">Բոլոր կայանների եկամուտ</span><strong id="e-revenue">—</strong></article>
+        <article class="card accent"><span data-i18n="e.extra">Լրացուցիչ՝ մարտկոցներից</span><strong id="e-extra">—</strong><em id="e-extra-pct"></em></article>
+        <article class="card"><span data-i18n="e.commission">Միջնորդավճար, 10%</span><strong id="e-peak">—</strong></article>
       </div>
+      <article class="panel">
+        <h2 data-i18n="exchange.dailyTitle">Բոլոր կայանները միասին, ըստ օրվա</h2>
+        <p class="note" data-i18n="exchange.dailyNote">Կանաչ սյունը՝ լրացուցիչ դրամը բոլոր կայաններից։ Դեղին գիծը՝ այդ օրը վաճառված էներգիան։</p>
+        <div class="chart-box tall"><canvas id="chart-exchange-daily"></canvas></div>
+      </article>
+      <article class="panel">
+        <h2 data-i18n="exchange.allTitle">Յուրաքանչյուր կայան</h2>
+        <p class="note" data-i18n="exchange.allNote">Սյունը կայանի վաճառքն է ընտրված ժամանակահատվածում։ Միասին սա ամբողջ ցանցն է։</p>
+        <div class="chart-box fleet"><canvas id="chart-all-stations"></canvas></div>
+      </article>
       <article class="panel">
         <h2 data-i18n="ml.title">Ինչ է անում մոդելը</h2>
         <ol class="steps">
           <li data-i18n="ml.q">Պատասխանում է մեկ հարցի. քանի կիլովատ-ժամ կարտադրի կայանը մոտակա ժամերին։</li>
-          <li data-i18n="ml.not">Գինը չի դնում։ Գնման ժամն ու սակագինը հայտարարում է ցանցը։</li>
           <li data-i18n="ml.use">Այդ թվով երևում է, արդյոք մարտկոցը կհասցնի լիցքավորվել մինչև վաճառքի ժամը։ Գրաֆիկում հոծ գիծը փաստն է, կետագիծը՝ կանխատեսումը։</li>
         </ol>
         <p class="note" id="model-blurb"></p>
@@ -176,6 +184,6 @@
     </section>
   </main>
   <script src="/static/chart.umd.min.js"></script>
-  <script src="/static/app.js?v=9"></script>
+  <script src="/static/app.js?v=10"></script>
 </body>
 </html>

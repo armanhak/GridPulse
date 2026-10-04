@@ -44,7 +44,7 @@ const COPY = {
     sub: "արևային էներգիայի բորսա",
     "nav.solar": "Արևային կայան",
     "nav.grid": "Էլեկտրացանց",
-    "nav.exchange": "Բորսա",
+    "nav.exchange": "Համակարգող",
     "nav.present": "Ներկայացում",
     "nav.back": "Բոլոր մուտքերը",
     "gate.lede": "Ընտրեք մուտքը։ Յուրաքանչյուր կողմ տեսնում է իր թվերը։",
@@ -52,7 +52,7 @@ const COPY = {
     "gate.gridText": "Որքան էներգիա մարտկոցները չեն թողել ցանց կեսօրին, և որքան են վերադարձրել այն ժամին, երբ ցանցը գնում է։",
     "gate.solar": "Մուտք որպես արևային կայան",
     "gate.solarText": "Վաճառված էներգիան, եկամուտը միջնորդավճարից հետո և լրացուցիչ գումարը մարտկոցի շնորհիվ։",
-    "gate.exchange": "Մուտք որպես բորսա",
+    "gate.exchange": "Մուտք որպես համակարգող",
     "gate.exchangeText": "Բոլոր կայանների արդյունքը, ծառայության 10%-ը և արտադրության կանխատեսման ճշտությունը։",
     "ml.title": "Ինչ է անում մոդելը",
     "ml.q": "Պատասխանում է մեկ հարցի. քանի կիլովատ-ժամ կարտադրի կայանը մոտակա ժամերին։",
@@ -92,14 +92,15 @@ const COPY = {
     "forecast.note": "Այս օրվա արդյունքը. սխալը {mae} կՎտ·ժ է։ Մարտկոցից ցանց սպասվել է {pred}, եղել է {actual}։ {train}",
     "forecast.seen": "Այս օրը եղել է ուսուցման մեջ։",
     "forecast.unseen": "Այս օրը մոդելը ուսուցման ժամանակ չի տեսել։",
-    "grid.lede": "Երբ պահանջարկը հեռու է օրվա գագաթից, ցանցը արևային էներգիա չի գնում։ Այն մնում է մարտկոցներում կամ կտրվում է։ Ընդունման ժամին կայանները վաճառում են անմիջապես։",
+    "grid.lede": "Երբ պահանջարկը հեռու է օրվա պիկից, ցանցը արևային էներգիա չի գնում։ Այն մնում է մարտկոցներում կամ կտրվում է։ Ընդունման ժամին կայանները վաճառում են անմիջապես։",
     "g.refused": "Չի ընդունվել, երբ պետք չէր",
     "g.battery": "Եկել է մարտկոցներից",
     "g.bought": "Գնվել է կայաններից",
     "g.delay": "Մինչև վաճառք",
-    "grid.hourTitle": "Ինչպես են մարտկոցները թեթևացնում ցանցը",
-    "grid.hourNote": "Դեղին սյունը՝ ինչ կլցվեր ցանց, եթե մարտկոց չլիներ. գագաթը կեսօրին է։ Կանաչ սյունը՝ ինչ իրականում է մտել։ Մուգ մասը մարտկոցից է։ Կեսօրին կանաչը դեղինից ցածր է. այդ էներգիան ցանց չի ծանրաբեռնել, մնացել է մարտկոցում։ Երեկոյան մուգ մասը գալիս է այն ժամին, երբ ցանցը գնում է։",
-    "grid.shift": "Ժամը 10:00–15:00 առանց մարտկոցի ցանց կմտներ {would}։ Չի մտել {held}. այդքանով կեսօրվա լրացուցիչ ծանրաբեռնում չի եղել։ Ժամը 17:00–21:00 մարտկոցները տվել են {eve}։",
+    "grid.hourTitle": "Արևային էներգիան ցանցում, ըստ ժամի",
+    "grid.hourNote": "Դեղին գիծը՝ որքան կմտներ ցանց ամեն ժամ, եթե մարտկոց չլիներ։ Կանաչ գիծը՝ որքան է իրականում մտել։ Կեսօրին կանաչը ցածր է. ավելցուկը մնացել է մարտկոցում, և ցանցը այդ ժամին չի ծանրաբեռնվել։ Երեկոյան կանաչը բարձր է. մարտկոցը այդ էներգիան տալիս է պիկի ժամին։",
+    "grid.shift": "Ժամը 10:00–15:00 առանց մարտկոցի կմտներ {would}։ Մարտկոցով ցանց չի մտել {held}։ Ժամը 17:00–21:00 մարտկոցները տվել են {eve}։",
+    "chart.with": "Մարտկոցով մտել է ցանց",
     "chart.without": "Առանց մարտկոցի կմտներ ցանց",
     "chart.direct": "Վահանակից, երբ ցանցը գնում է",
     "chart.fromBatt": "Մարտկոցից, երբ ցանցը գնում է",
@@ -110,8 +111,14 @@ const COPY = {
     "grid.modelNote": "Մոդելը կանխատեսում է արտադրությունը, ապա հաշվում է, թե որքան կգա մարտկոցներից։ Կանաչը փաստն է, կապույտը՝ կանխատեսումը։ Այս օրը սպասվել է {pred}, եղել է {actual}։ {train}",
     "forecast.seenShort": "Օրը եղել է ուսուցման մեջ։",
     "forecast.unseenShort": "Օրը ուսուցման մեջ չի եղել։",
-    "exchange.lede": "Այստեղ երևում են կայանների լրացուցիչ եկամուտը, ծառայության 10% միջնորդավճարը և այն, թե որքան ճշգրիտ է արտադրության կանխատեսումը։",
-    "e.extra": "Բոլոր կայանների լրացուցիչ եկամուտ",
+    "exchange.lede": "Այստեղ 30 կայանների ընդհանուր պատկերն է. վաճառք, եկամուտ, մարտկոցի լրացուցիչ գումարը և ծառայության 10%-ը։",
+    "e.revenue": "Բոլոր կայանների եկամուտ",
+    "e.extra": "Լրացուցիչ՝ մարտկոցներից",
+    "exchange.dailyTitle": "Բոլոր կայանները միասին, ըստ օրվա",
+    "exchange.dailyNote": "Կանաչ սյունը՝ լրացուցիչ դրամը բոլոր կայաններից։ Դեղին գիծը՝ այդ օրը վաճառված էներգիան։",
+    "exchange.allTitle": "Յուրաքանչյուր կայան",
+    "exchange.allNote": "Սյունը կայանի վաճառքն է ընտրված ժամանակահատվածում։ Միասին սա ամբողջ ցանցն է։",
+    "th.total": "Բոլորը",
     "e.commission": "Միջնորդավճար, 10%",
     "e.sold": "Վաճառվել է ցանցին",
     "e.mae": "Մոդելի սխալ, ժամը 7–18",
@@ -150,7 +157,7 @@ const COPY = {
     sub: "solar energy exchange",
     "nav.solar": "Solar station",
     "nav.grid": "Power grid",
-    "nav.exchange": "Exchange",
+    "nav.exchange": "Coordinator",
     "nav.present": "Overview",
     "nav.back": "All entrances",
     "gate.lede": "Choose an entrance. Each side sees its own numbers.",
@@ -158,7 +165,7 @@ const COPY = {
     "gate.gridText": "How much energy the batteries kept out of the grid at noon, and how much they returned when the grid was buying.",
     "gate.solar": "Enter as a solar station",
     "gate.solarText": "Energy sold, income after the commission, and the extra amount earned because of the battery.",
-    "gate.exchange": "Enter as the exchange",
+    "gate.exchange": "Enter as the coordinator",
     "gate.exchangeText": "The result of every station, the service’s 10%, and how accurate the generation forecast is.",
     "ml.title": "What the model does",
     "ml.q": "It answers one question: how many kilowatt-hours this station will produce in the coming hours.",
@@ -203,9 +210,10 @@ const COPY = {
     "g.battery": "Delivered from batteries",
     "g.bought": "Bought from stations",
     "g.delay": "Until the sale",
-    "grid.hourTitle": "How the batteries lighten the grid",
-    "grid.hourNote": "The yellow bar is what would have poured into the grid with no battery: the peak is at noon. The green bar is what actually entered. The dark part comes from the battery. At noon the green bar is lower than the yellow one: that energy did not load the grid, it stayed in the battery. In the evening the dark part arrives in the hour the grid is buying.",
-    "grid.shift": "From 10:00 to 15:00, {would} would have entered without batteries. {held} stayed out, so the grid did not take that midday load. From 17:00 to 21:00 the batteries delivered {eve}.",
+    "grid.hourTitle": "Solar energy in the grid, by hour",
+    "grid.hourNote": "The yellow line is how much would enter the grid each hour with no battery. The green line is how much actually entered. At noon the green line is lower: the surplus stayed in the batteries and did not load the grid. In the evening the green line is higher: the batteries deliver that energy at the peak.",
+    "grid.shift": "From 10:00 to 15:00, {would} would have entered without batteries. With batteries, {held} stayed out. From 17:00 to 21:00 the batteries delivered {eve}.",
+    "chart.with": "Entered with batteries",
     "chart.without": "Would enter with no battery",
     "chart.direct": "From the panel, when the grid is buying",
     "chart.fromBatt": "From the battery, when the grid is buying",
@@ -216,8 +224,14 @@ const COPY = {
     "grid.modelNote": "The model forecasts generation, then calculates how much will come from the batteries. Green is what happened, blue is the forecast. This day it expected {pred}; the actual delivery was {actual}. {train}",
     "forecast.seenShort": "The day was part of training.",
     "forecast.unseenShort": "The day was not part of training.",
-    "exchange.lede": "Here you see the stations’ extra income, the service’s 10% commission, and how accurate the generation forecast is.",
-    "e.extra": "Extra income of all stations",
+    "exchange.lede": "This is the picture of all 30 stations: energy sold, income, the extra amount from the batteries, and the service’s 10%.",
+    "e.revenue": "Income of all stations",
+    "e.extra": "Extra from the batteries",
+    "exchange.dailyTitle": "All stations together, by day",
+    "exchange.dailyNote": "The green bar is extra dram from every station. The yellow line is the energy sold that day.",
+    "exchange.allTitle": "Each station",
+    "exchange.allNote": "Each bar is that station’s sales in the selected period. Together they are the whole fleet.",
+    "th.total": "All",
     "e.commission": "Commission, 10%",
     "e.sold": "Sold to the grid",
     "e.mae": "Model error, hours 7–18",
@@ -550,27 +564,28 @@ async function loadGrid() {
   });
 
   putChart("chart-grid-hour", {
-    type: "bar",
+    type: "line",
     data: {
       labels: data.hourly.map((row) => String(row.hour).padStart(2, "0")),
       datasets: [
         {
           label: t("chart.without"),
           data: data.hourly.map((row) => row.immediate_kwh),
-          backgroundColor: "rgba(227,155,43,0.85)",
-          stack: "without",
+          borderColor: sun,
+          backgroundColor: "rgba(227,155,43,0.14)",
+          fill: true,
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.35,
         },
         {
-          label: t("chart.direct"),
-          data: data.hourly.map((row) => Math.max(0, row.sold_kwh - row.battery_kwh)),
-          backgroundColor: "#c5e0d2",
-          stack: "with",
-        },
-        {
-          label: t("chart.fromBatt"),
-          data: data.hourly.map((row) => row.battery_kwh),
+          label: t("chart.with"),
+          data: data.hourly.map((row) => row.sold_kwh),
+          borderColor: leaf,
           backgroundColor: leaf,
-          stack: "with",
+          pointRadius: 0,
+          borderWidth: 2.5,
+          tension: 0.35,
         },
       ],
     },
@@ -612,13 +627,8 @@ async function loadExchange() {
   document.getElementById("e-extra-pct").textContent = fill("solar.extraPct", { pct: formatPct(data.extra_pct) });
   document.getElementById("e-peak").textContent = formatAmd(data.commission_amd);
   document.getElementById("e-sold").textContent = formatEnergy(data.sold_kwh);
+  document.getElementById("e-revenue").textContent = formatAmd(data.revenue_amd);
   const model = data.metrics;
-  document.getElementById("e-mae").textContent = `${num(model.mae_daylight, 3)} ${t("unit.kwh")}`;
-  const lift = Math.round(100 * (model.mae_profile - model.mae_daylight) / model.mae_profile);
-  document.getElementById("e-mae-note").textContent = fill("e.maeNote", {
-    profile: num(model.mae_profile, 3),
-    lift,
-  });
   document.getElementById("model-blurb").textContent = fill("ml.global", {
     mae: num(model.mae_daylight, 3),
     profile: num(model.mae_profile, 3),
@@ -629,6 +639,38 @@ async function loadExchange() {
     t("fact.features"),
     t("fact.commission"),
   ].map((item) => `<li>${item}</li>`).join("");
+
+  putChart("chart-exchange-daily", {
+    type: "bar",
+    data: {
+      labels: (data.daily || []).map((row) => row.date.slice(5)),
+      datasets: [
+        { type: "bar", label: t("chart.extra"), data: data.daily.map((row) => row.extra_amd), backgroundColor: leaf, yAxisID: "y" },
+        { type: "line", label: t("chart.sold"), data: data.daily.map((row) => row.sold_kwh), borderColor: sun, backgroundColor: sun, pointRadius: 0, tension: 0.25, yAxisID: "y1" },
+      ],
+    },
+    options: {
+      scales: {
+        x: axis(),
+        y: axis(t("unit.dram")),
+        y1: { ...axis(t("unit.kwh")), position: "right", grid: { drawOnChartArea: false } },
+      },
+    },
+  });
+
+  const fleet = [...data.stations].sort((a, b) => b.sold_kwh - a.sold_kwh);
+  putChart("chart-all-stations", {
+    type: "bar",
+    data: {
+      labels: fleet.map((row) => row.id),
+      datasets: [{ label: t("chart.sold"), data: fleet.map((row) => row.sold_kwh), backgroundColor: leaf }],
+    },
+    options: {
+      indexAxis: "y",
+      plugins: { legend: { display: false } },
+      scales: { x: axis(t("unit.kwh")), y: axis() },
+    },
+  });
 
   putChart("chart-regions", {
     type: "bar",
@@ -644,7 +686,18 @@ async function loadExchange() {
   });
 
   const body = document.getElementById("station-rows");
-  body.innerHTML = data.stations.map((row) => `
+  const totalRow = `
+    <tr class="total">
+      <td>${t("th.total")}</td>
+      <td>${data.stations.length}</td>
+      <td>${num(data.stations.reduce((sum, row) => sum + row.pv_kw, 0), 1)}</td>
+      <td>${num(data.sold_kwh, 0)}</td>
+      <td>${num(Math.round(data.revenue_amd), 0)}</td>
+      <td>${num(Math.round(data.extra_amd), 0)}</td>
+      <td>${formatPct(data.extra_pct)}</td>
+      <td>${num(data.battery_peak_kwh, 1)}</td>
+    </tr>`;
+  body.innerHTML = totalRow + data.stations.map((row) => `
     <tr data-station="${row.id}">
       <td>${row.id}</td>
       <td>${place(row.region)}</td>
@@ -656,7 +709,7 @@ async function loadExchange() {
       <td>${num(row.battery_peak_kwh, 1)}</td>
     </tr>
   `).join("");
-  body.querySelectorAll("tr").forEach((row) => {
+  body.querySelectorAll("tr[data-station]").forEach((row) => {
     row.addEventListener("click", () => {
       state.station = row.dataset.station;
       document.getElementById("station").value = state.station;
