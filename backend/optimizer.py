@@ -29,11 +29,14 @@ import pulp
 from .models import (
     BatteryConfig,
     BuyerHourlyCost,
+    CostBreakdown,
     ForecastPoint,
     HourSchedule,
     Kpis,
+    PlanComparison,
     PlanResponse,
     ScheduleBlock,
+    SelfConsumptionHour,
     SellerSale,
     SiteConfig,
 )
@@ -216,6 +219,128 @@ def _blocks(rows: list[HourSchedule]) -> list[ScheduleBlock]:
     return blocks
 
 
+def _demand_response_settlement(hours: list[ForecastPoint]) -> tuple[float, float]:
+    """Curtailed kWh and a demo payment for agreeing to the cut.
+
+    The payment is the buy price of the energy the site does not consume.
+    It is cash for the curtailment, not a saving from the dispatch.
+    """
+    curtailed = 0.0
+    compensation = 0.0
+    for point in hours:
+        if point.hour not in DEMAND_RESPONSE_HOURS:
+            continue
+        cut = point.load_kwh * (1.0 - DEMAND_RESPONSE_KEEP)
+        curtailed += cut
+        compensation += cut * point.buy_price_amd
+    return curtailed, compensation
+
+
+def _simulate_self_consumption(
+    hours: list[ForecastPoint],
+    battery: BatteryConfig,
+) -> list[dict[str, float | int | str]]:
+    """Charge surplus solar, discharge only into the building.
+
+    The day ends at or above the starting charge, same rule as the linear
+    program, so neither policy can book a saving by emptying the battery.
+    """
+    capacity = battery.capacity_kwh
+    eta_c = battery.charge_efficiency
+    eta_d = battery.discharge_efficiency
+    initial = battery.soc_initial * capacity
+    energy_min = battery.soc_min * capacity
+    energy_max = battery.soc_max * capacity
+    max_charge = 0.0 if capacity == 0.0 else battery.max_charge_kw
+    max_discharge = 0.0 if capacity == 0.0 else battery.max_discharge_kw
+    soc = initial
+    records: list[dict[str, float | int | str]] = []
+
+    for point in hours:
+        served = min(point.solar_kwh, point.load_kwh)
+        surplus = point.solar_kwh - served
+        deficit = point.load_kwh - served
+        room = max(0.0, energy_max - soc)
+        charge_room = room / eta_c if eta_c > 0.0 else 0.0
+        charge = min(surplus, max_charge, charge_room)
+        available = max(0.0, soc + eta_c * charge - energy_min)
+        discharge = min(deficit, max_discharge, available * eta_d)
+        soc = soc + eta_c * charge - (discharge / eta_d if eta_d > 0.0 else 0.0)
+        records.append(
+            {
+                "hour": point.hour,
+                "label": point.label,
+                "buy": point.buy_price_amd,
+                "sell": point.sell_price_amd,
+                "charge": charge,
+                "discharge": discharge,
+                "grid_import": deficit - discharge,
+                "grid_export": surplus - charge,
+                "soc": soc,
+            }
+        )
+
+    shortfall = initial - float(records[-1]["soc"])
+    if shortfall > 1e-7:
+        for record in reversed(records):
+            if shortfall <= 1e-7:
+                break
+            stored_in_discharge = float(record["discharge"]) / eta_d
+            take = min(stored_in_discharge, shortfall)
+            returned = min(float(record["discharge"]), take * eta_d)
+            record["discharge"] = float(record["discharge"]) - returned
+            record["grid_import"] = float(record["grid_import"]) + returned
+            shortfall -= returned / eta_d
+        soc = initial
+        for record in records:
+            soc = soc + eta_c * float(record["charge"]) - float(record["discharge"]) / eta_d
+            record["soc"] = soc
+    return records
+
+
+def _breakdown(
+    import_cost: float,
+    export_revenue: float,
+    wear_cost: float,
+    import_kwh: float,
+    export_kwh: float,
+) -> CostBreakdown:
+    return CostBreakdown(
+        import_cost_amd=round(import_cost, 2),
+        export_revenue_amd=round(export_revenue, 2),
+        wear_amd=round(wear_cost, 2),
+        net_cost_amd=round(import_cost - export_revenue + wear_cost, 2),
+        import_kwh=round(import_kwh, 3),
+        export_kwh=round(export_kwh, 3),
+    )
+
+
+def _comparison(
+    no_battery: CostBreakdown,
+    self_use: CostBreakdown,
+    optimized: CostBreakdown,
+    dispatch_import_kwh_delta: float,
+) -> PlanComparison:
+    """Publish a bridge that adds up to the dispatch delta after rounding."""
+    dispatch_value = round(self_use.net_cost_amd - optimized.net_cost_amd, 2)
+    battery_value = round(no_battery.net_cost_amd - self_use.net_cost_amd, 2)
+    import_delta = round(self_use.import_cost_amd - optimized.import_cost_amd, 2)
+    export_delta = round(optimized.export_revenue_amd - self_use.export_revenue_amd, 2)
+    wear_delta = round(import_delta + export_delta - dispatch_value, 2)
+    return PlanComparison(
+        no_battery=no_battery,
+        self_consumption=self_use,
+        optimized=optimized,
+        battery_value_amd=battery_value,
+        dispatch_value_amd=dispatch_value,
+        import_delta_amd=import_delta,
+        export_delta_amd=export_delta,
+        wear_delta_amd=wear_delta,
+        dispatch_import_kwh_delta=round(dispatch_import_kwh_delta, 3),
+        dispatch_co2_delta_kg=round(dispatch_import_kwh_delta * GRID_CO2_KG_PER_KWH, 3),
+    )
+
+
 def _apply_demand_response(hours: list[ForecastPoint]) -> list[ForecastPoint]:
     """Cut 40% of the commercial load during the evening peak window 18:00–21:00."""
     adjusted: list[ForecastPoint] = []
@@ -367,7 +492,10 @@ def optimize_day(
     """Solve one day and return the schedule, KPIs and seller/buyer accounts."""
     if [point.hour for point in hours] != list(range(24)):
         raise OptimizationError("Forecast must contain hours 0 through 23 in order", status="InvalidForecast")
+    curtailed_kwh = 0.0
+    compensation_amd = 0.0
     if demand_response_active:
+        curtailed_kwh, compensation_amd = _demand_response_settlement(hours)
         hours = _apply_demand_response(hours)
         scenario_title = f"{scenario_title} · DR 18:00–21:00"
 
@@ -519,6 +647,66 @@ def optimize_day(
             )
         )
 
+    wear_rate = battery.degradation_amd_per_kwh
+    opt_import_cost = sum(
+        (row.grid_to_load_kwh + row.grid_to_battery_kwh) * row.buy_price_amd for row in schedule
+    )
+    opt_export_revenue = sum(
+        (row.pv_to_grid_kwh + row.battery_to_grid_kwh) * row.sell_price_amd for row in schedule
+    )
+    opt_wear = sum((row.charge_kwh + row.discharge_kwh) * wear_rate for row in schedule)
+    opt_import_kwh = sum(row.grid_to_load_kwh + row.grid_to_battery_kwh for row in schedule)
+    opt_export_kwh = sum(row.pv_to_grid_kwh + row.battery_to_grid_kwh for row in schedule)
+    no_battery_import_cost = sum(row.baseline_import_kwh * row.buy_price_amd for row in schedule)
+    no_battery_export_revenue = sum(row.baseline_export_kwh * row.sell_price_amd for row in schedule)
+    no_battery_import_kwh = sum(row.baseline_import_kwh for row in schedule)
+    no_battery_export_kwh = sum(row.baseline_export_kwh for row in schedule)
+
+    self_records = _simulate_self_consumption(hours, battery)
+    self_import_cost = sum(float(row["grid_import"]) * float(row["buy"]) for row in self_records)
+    self_export_revenue = sum(float(row["grid_export"]) * float(row["sell"]) for row in self_records)
+    self_wear = sum((float(row["charge"]) + float(row["discharge"])) * wear_rate for row in self_records)
+    self_import_kwh = sum(float(row["grid_import"]) for row in self_records)
+    self_export_kwh = sum(float(row["grid_export"]) for row in self_records)
+    self_hours: list[SelfConsumptionHour] = []
+    for row in self_records:
+        imported = float(row["grid_import"])
+        exported = float(row["grid_export"])
+        charged = float(row["charge"])
+        discharged = float(row["discharge"])
+        hour_net = (
+            float(row["buy"]) * imported
+            - float(row["sell"]) * exported
+            + wear_rate * (charged + discharged)
+        )
+        soc_kwh = float(row["soc"])
+        soc_pct = 0.0 if capacity == 0.0 else 100.0 * soc_kwh / capacity
+        self_hours.append(
+            SelfConsumptionHour(
+                hour=int(row["hour"]),
+                label=str(row["label"]),
+                charge_kwh=round(charged, 3),
+                discharge_kwh=round(discharged, 3),
+                soc_kwh=round(soc_kwh, 3),
+                soc_pct=round(soc_pct, 2),
+                grid_import_kwh=round(imported, 3),
+                grid_export_kwh=round(exported, 3),
+                net_cost_amd=round(hour_net, 2),
+            )
+        )
+    comparison = _comparison(
+        _breakdown(
+            no_battery_import_cost,
+            no_battery_export_revenue,
+            0.0,
+            no_battery_import_kwh,
+            no_battery_export_kwh,
+        ),
+        _breakdown(self_import_cost, self_export_revenue, self_wear, self_import_kwh, self_export_kwh),
+        _breakdown(opt_import_cost, opt_export_revenue, opt_wear, opt_import_kwh, opt_export_kwh),
+        opt_import_kwh - self_import_kwh,
+    )
+
     counts = Counter(row.decision for row in schedule)
     solar_total = sum(row.solar_kwh for row in schedule)
     load_total = sum(row.load_kwh for row in schedule)
@@ -577,9 +765,13 @@ def optimize_day(
         battery=battery,
         site=resolved_site,
         kpis=kpis,
+        comparison=comparison,
         blocks=plan_blocks,
         hours=schedule,
+        self_consumption_hours=self_hours,
         demand_response_active=demand_response_active,
+        demand_response_curtailed_kwh=round(curtailed_kwh, 3),
+        demand_response_compensation_amd=round(compensation_amd, 2),
         peak_shaving_active=peak_shaving_active,
         seller_total_solar_kwh=accounts["seller_total_solar_kwh"],
         seller_total_sold_kwh=accounts["seller_total_sold_kwh"],
@@ -615,6 +807,12 @@ def _print_plan(plan: PlanResponse) -> None:
         f"bill {plan.buyer_optimized_cost_amd:.0f} vs {plan.buyer_baseline_cost_amd:.0f} | "
         f"saved {plan.buyer_savings_amd:.0f}"
     )
+    print(
+        f"bill self-use {plan.comparison.self_consumption.net_cost_amd:.0f} | "
+        f"optimal {plan.comparison.optimized.net_cost_amd:.0f} | "
+        f"dispatch {plan.comparison.dispatch_value_amd:.0f} | "
+        f"battery vs none {plan.comparison.battery_value_amd:.0f}"
+    )
     print("hour decision  charge  disch  soc%   import  export  cost")
     for row in plan.hours:
         print(
@@ -641,6 +839,35 @@ if __name__ == "__main__":
         if plan.kpis.savings_amd < -0.05:
             print("ERROR: savings below baseline")
             failed = True
+        comparison = plan.comparison
+        bridge = (
+            comparison.import_delta_amd
+            + comparison.export_delta_amd
+            - comparison.wear_delta_amd
+        )
+        if abs(bridge - comparison.dispatch_value_amd) > 0.02:
+            print("ERROR: dispatch bridge does not add up to the delta")
+            failed = True
+        if comparison.dispatch_value_amd < -0.05:
+            print("ERROR: optimal plan loses to self-consumption")
+            failed = True
+        identity = (
+            comparison.battery_value_amd
+            + comparison.dispatch_value_amd
+            - (comparison.no_battery.net_cost_amd - comparison.optimized.net_cost_amd)
+        )
+        if abs(identity) > 0.05:
+            print("ERROR: battery value and dispatch value do not rebuild the no-battery gap")
+            failed = True
+        initial_kwh = preset.battery.soc_initial * preset.battery.capacity_kwh
+        ending_kwh = plan.self_consumption_hours[-1].soc_kwh
+        if ending_kwh + 0.05 < initial_kwh:
+            print("ERROR: self-consumption ends below the starting charge")
+            failed = True
+        for row in plan.self_consumption_hours:
+            if row.charge_kwh > 0.05 and row.discharge_kwh > 0.05:
+                print(f"ERROR: self-consumption charges and discharges at {row.label}")
+                failed = True
         if abs(sum(item.volume_kwh for item in plan.seller_sales_log) - plan.seller_total_sold_kwh) > 0.05:
             print("ERROR: seller sales log does not match sold volume")
             failed = True
@@ -698,6 +925,18 @@ if __name__ == "__main__":
         if abs(actual - expected) > 0.05:
             print(f"ERROR: demand response did not cut hour {hour}: {actual} vs {expected}")
             failed = True
+    expected_cut = sum(
+        base_plan.hours[hour].load_kwh * (1.0 - DEMAND_RESPONSE_KEEP) for hour in DEMAND_RESPONSE_HOURS
+    )
+    if abs(dr_plan.demand_response_curtailed_kwh - expected_cut) > 0.05:
+        print(
+            "ERROR: demand response curtailment "
+            f"{dr_plan.demand_response_curtailed_kwh} vs {expected_cut}"
+        )
+        failed = True
+    if dr_plan.demand_response_compensation_amd <= 0:
+        print("ERROR: demand response compensation is missing")
+        failed = True
     passive_seller = sum(row.baseline_export_kwh * row.sell_price_amd for row in base_plan.hours)
     if base_plan.seller_revenue_amd <= passive_seller + 1.0:
         print("ERROR: seller revenue is not above the passive feed-in")

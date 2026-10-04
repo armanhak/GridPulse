@@ -27,11 +27,13 @@ logger = logging.getLogger("voltsync")
 app = FastAPI(
     title="VoltSync VPP",
     version=__version__,
-    summary="Three-role VPP dispatch: network balance, seller revenue, buyer bill.",
+    summary="Day-ahead battery dispatch for one prosumer site.",
     description=(
-        "Generates a synthetic Yerevan day (solar, load, tariffs) and solves a "
-        "linear program for a shared pool. The same plan feeds the dispatcher, "
-        "the prosumer seller, and the commercial buyer."
+        "Generates a synthetic Yerevan day (solar, load, demo tariffs) and solves "
+        "a linear program: store, use, or sell. The rooftop bill is compared with "
+        "dumb self-consumption on the same battery and with a site that has no battery. "
+        "Seller and buyer fields are a separate settlement sketch. They are not the "
+        "rooftop bill and they are not a live market."
     ),
 )
 

@@ -118,6 +118,52 @@ class ScheduleBlock(BaseModel):
     text: str
 
 
+class CostBreakdown(BaseModel):
+    """One bill: imports, exports and battery wear, in AMD."""
+
+    import_cost_amd: float
+    export_revenue_amd: float
+    wear_amd: float
+    net_cost_amd: float
+    import_kwh: float
+    export_kwh: float
+
+
+class PlanComparison(BaseModel):
+    """Rooftop bill under three policies for the same day and the same battery.
+
+    no_battery exports surplus immediately and buys every deficit.
+    self_consumption uses the battery only as a solar buffer for the building.
+    optimized is the linear program. Dispatch value is the software: the gap
+    between self-consumption and the optimal plan, not the value of owning a battery.
+    """
+
+    no_battery: CostBreakdown
+    self_consumption: CostBreakdown
+    optimized: CostBreakdown
+    battery_value_amd: float
+    dispatch_value_amd: float
+    import_delta_amd: float
+    export_delta_amd: float
+    wear_delta_amd: float
+    dispatch_import_kwh_delta: float
+    dispatch_co2_delta_kg: float
+
+
+class SelfConsumptionHour(BaseModel):
+    """Greedy solar self-consumption for one hour, on the same battery limits."""
+
+    hour: int
+    label: str
+    charge_kwh: float
+    discharge_kwh: float
+    soc_kwh: float
+    soc_pct: float
+    grid_import_kwh: float
+    grid_export_kwh: float
+    net_cost_amd: float
+
+
 class Kpis(BaseModel):
     optimized_net_cost_amd: float
     baseline_net_cost_amd: float
@@ -169,7 +215,7 @@ class BuyerHourlyCost(BaseModel):
 
 
 class PlanResponse(BaseModel):
-    """Optimization response for the three-role VPP: dispatcher, seller, and buyer."""
+    """Day-ahead dispatch for one site, plus a separate seller/buyer settlement sketch."""
 
     scenario: str | None
     scenario_title: str
@@ -180,9 +226,13 @@ class PlanResponse(BaseModel):
     battery: BatteryConfig
     site: SiteConfig
     kpis: Kpis
+    comparison: PlanComparison
     blocks: list[ScheduleBlock]
     hours: list[HourSchedule]
+    self_consumption_hours: list[SelfConsumptionHour]
     demand_response_active: bool = False
+    demand_response_curtailed_kwh: float = 0.0
+    demand_response_compensation_amd: float = 0.0
     peak_shaving_active: bool = False
     seller_total_solar_kwh: float = 0.0
     seller_total_sold_kwh: float = 0.0

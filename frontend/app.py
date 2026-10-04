@@ -1,4 +1,4 @@
-"""VoltSync: one screen that answers store, use, or sell."""
+"""VoltSync: one synthetic day, one battery, two bills."""
 
 from __future__ import annotations
 
@@ -14,28 +14,45 @@ from plotly.subplots import make_subplots
 
 DEFAULT_API_URL = os.environ.get("VOLTSYNC_API_URL", "http://localhost:8000")
 
-AMBER = "#f59e0b"
 EMERALD = "#10b981"
 BLUE = "#3b82f6"
 PURPLE = "#a78bfa"
 RED = "#f87171"
 GOLD = "#fbbf24"
+SLATE = "#94a3b8"
 
-MODE_BASELINE = "Режим 1: Обычный объект (Без системы VoltSync)"
-MODE_AI = "Режим 2: VoltSync AI (Оптимальный арбитраж)"
-MODE_DR = "Режим 3: Команда энергосети (Demand Response)"
-MODES = (MODE_BASELINE, MODE_AI, MODE_DR)
+DECISION_RU = {
+    "store": "Сохранить",
+    "use": "Потребить",
+    "sell": "Продать",
+    "idle": "Пауза",
+}
 
-MORNING = range(10, 15)
-EVENING = range(18, 22)
-NIGHT = (23, 0, 1, 2, 3, 4, 5, 6)
+SCENARIO_RU = {
+    "yerevan_summer": (
+        "Ясный летний день, Ереван",
+        "Крыша закрывает день и наполняет батарею. Вечерняя нагрузка берется из накопителя.",
+    ),
+    "cloudy_day": (
+        "Облачный будний день",
+        "Солнца мало. План докупает дешевую ночную энергию и отдает ее, когда тариф выше.",
+    ),
+    "evening_export_spike": (
+        "Вечерний скачок цены продажи",
+        "Вечером продажа дороже, чем экономия на своем потреблении. Запас уходит в сеть.",
+    ),
+    "pv_surplus": (
+        "Большая СЭС, маленькая батарея",
+        "Массив больше и нагрузки, и батареи. Полуденный излишек продается, когда накопитель полон.",
+    ),
+}
 
-st.set_page_config(
-    page_title="VoltSync VPP",
-    page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
+TARIFF_RU = {
+    "standard_tou": "Тариф по времени суток",
+    "export_spike": "Вечерний скачок продажи",
+}
+
+st.set_page_config(page_title="VoltSync", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown(
     """
@@ -43,88 +60,38 @@ st.markdown(
       .stApp { background: #0e1117; color: #e7eef8; }
       header[data-testid="stHeader"] { background: transparent; }
       #MainMenu, footer, [data-testid="stDecoration"] { display: none; }
-      [data-testid="stSidebar"] {
-        background: #131722;
-        border-right: 1px solid rgba(255, 255, 255, 0.06);
-      }
-      .vs-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        margin-bottom: 8px;
-      }
+      [data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
+      .vs-kicker { color: #94a3b8; font-size: 0.92rem; margin: 0 0 4px 0; }
       .vs-logo {
-        font-size: 1.7rem;
-        font-weight: 740;
-        letter-spacing: -0.03em;
-        color: #f8fafc;
-        margin: 0;
+        font-size: 1.7rem; font-weight: 740; letter-spacing: -0.03em;
+        color: #f8fafc; margin: 0;
       }
-      .vs-sub { color: #94a3b8; margin: 4px 0 0 0; font-size: 1.02rem; }
-      .vs-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        border-radius: 999px;
-        padding: 8px 14px;
-        font-weight: 680;
-        font-size: 0.92rem;
-        white-space: nowrap;
+      .vs-sub { color: #cbd5e1; margin: 6px 0 0 0; font-size: 1.02rem; max-width: 46rem; }
+      .vs-meta { color: #94a3b8; margin: 8px 0 0 0; font-size: 0.92rem; }
+      .vs-card, .vs-stage {
+        background: #131722; border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px; padding: 16px 16px 14px 16px; height: 100%;
       }
-      .vs-badge-live {
-        color: #6ee7b7;
-        background: rgba(16, 185, 129, 0.12);
-        border: 1px solid rgba(16, 185, 129, 0.45);
-        animation: vs-pulse 1.8s ease-out infinite;
+      .vs-label { color: #94a3b8; font-size: 0.86rem; }
+      .vs-value {
+        font-size: 1.7rem; line-height: 1.15; font-weight: 740;
+        color: #f8fafc; margin: 8px 0;
       }
-      .vs-badge-off {
-        color: #fecaca;
-        background: rgba(248, 113, 113, 0.1);
-        border: 1px solid rgba(248, 113, 113, 0.35);
-      }
-      @keyframes vs-pulse {
-        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
-        70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-      }
-      .vs-kpi, .vs-stage, .vs-bill {
-        background: #131722;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 16px 16px 14px 16px;
-      }
-      .vs-kpi-label, .vs-stage-time { color: #94a3b8; font-size: 0.86rem; }
-      .vs-kpi-value {
-        font-size: 2rem;
-        line-height: 1.15;
-        font-weight: 740;
-        color: #f8fafc;
-        margin: 8px 0 8px 0;
-      }
+      .vs-card p, .vs-stage p { color: #cbd5e1; margin: 0; line-height: 1.45; }
+      .vs-stage h3 { margin: 8px 0; color: #f8fafc; font-size: 1.05rem; }
       .vs-pill {
-        display: inline-block;
-        border-radius: 999px;
-        padding: 4px 10px;
-        font-weight: 700;
-        font-size: 0.86rem;
+        display: inline-block; border-radius: 999px; padding: 4px 10px;
+        font-weight: 700; font-size: 0.82rem;
       }
       .vs-pill-good { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
       .vs-pill-bad { background: rgba(248, 113, 113, 0.14); color: #fecaca; }
       .vs-pill-amber { background: rgba(245, 158, 11, 0.16); color: #fcd34d; }
-      .vs-stage h3 { margin: 8px 0; color: #f8fafc; font-size: 1.15rem; }
-      .vs-stage p { color: #cbd5e1; margin: 0; line-height: 1.45; }
-      .vs-term { border-bottom: 1px dashed rgba(148, 163, 184, 0.7); cursor: help; }
-      div[data-testid="stRadio"] div[role="radiogroup"] { gap: 8px; }
-      div[data-testid="stRadio"] label {
-        background: #131722;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 8px 12px;
-      }
-      .vs-bills { display: flex; gap: 16px; margin: 8px 0 16px 0; }
-      .vs-bill b { display: block; font-size: 1.6rem; color: #f8fafc; margin-top: 4px; }
-      .vs-note { color: #94a3b8; font-size: 0.88rem; }
+      .vs-pill-blue { background: rgba(59, 130, 246, 0.16); color: #bfdbfe; }
+      .vs-note { color: #94a3b8; font-size: 0.9rem; line-height: 1.45; }
+      .vs-bridge { width: 100%; border-collapse: collapse; margin-top: 4px; }
+      .vs-bridge td { padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; }
+      .vs-bridge td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+      .vs-bridge tr:last-child td { border-bottom: 0; font-weight: 740; color: #f8fafc; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -165,158 +132,124 @@ def _error_text(response: requests.Response) -> str:
 
 
 def _amd(value: float) -> str:
-    return f"{value:,.0f} AMD"
+    sign = "−" if value < 0 else ""
+    return f"{sign}{abs(value):,.0f} AMD".replace(",", " ")
 
 
-def _window(hours: list[dict[str, Any]], hours_of_day: range | tuple[int, ...]) -> list[dict[str, Any]]:
-    chosen = set(hours_of_day)
-    return [row for row in hours if int(row["hour"]) in chosen]
+def _signed_amd(value: int) -> str:
+    if value > 0:
+        return f"+{_amd(value)}"
+    return _amd(value)
 
 
-def _avg_price(rows: list[dict[str, Any]], key: str) -> float:
-    if not rows:
-        return 0.0
-    return sum(float(row[key]) for row in rows) / len(rows)
+def _scenario_copy(scenario_id: str, fallback_title: str, fallback_text: str) -> tuple[str, str]:
+    return SCENARIO_RU.get(scenario_id, (fallback_title, fallback_text))
 
 
-def _money_story(plan: dict[str, Any], managed: bool) -> dict[str, float]:
-    hours = plan["hours"]
-    kpis = plan["kpis"]
-    evening = _window(hours, EVENING)
-    peak_saved = sum(
-        max(0.0, float(row["baseline_import_kwh"]) - float(row["grid_to_load_kwh"]) - float(row["grid_to_battery_kwh"]))
-        * float(row["buy_price_amd"])
-        for row in evening
-    )
-    peak_paid = sum(float(row["baseline_import_kwh"]) * float(row["buy_price_amd"]) for row in evening)
-    export_revenue = sum(
-        (float(row["pv_to_grid_kwh"]) + float(row["battery_to_grid_kwh"])) * float(row["sell_price_amd"])
-        for row in hours
-    )
-    cheap_export = sum(float(row["baseline_export_kwh"]) * float(row["sell_price_amd"]) for row in hours)
-    stored = sum(float(row["pv_to_battery_kwh"]) for row in hours)
-    return {
-        "savings_amd": float(kpis["savings_amd"]) if managed else 0.0,
-        "savings_pct": float(kpis["savings_pct"]) if managed else 0.0,
-        "peak_amd": peak_saved if managed else peak_paid,
-        "sales_amd": export_revenue if managed else cheap_export,
-        "saved_kwh": stored if managed else 0.0,
-        "bill_without": float(kpis["baseline_net_cost_amd"]),
-        "bill_with": float(kpis["optimized_net_cost_amd"]),
-    }
+def _gap_sentence(amount: int, actor: str, baseline: str) -> str:
+    if amount > 0:
+        return f"{actor} дешевле, чем {baseline}, на {_amd(amount)}."
+    if amount < 0:
+        return f"{actor} дороже, чем {baseline}, на {_amd(abs(amount))}."
+    return f"{actor} совпадает со счетом «{baseline}»."
 
 
-def _stage_copy(plan: dict[str, Any], mode: str) -> list[dict[str, str]]:
-    hours = plan["hours"]
-    morning = _window(hours, MORNING)
-    evening = _window(hours, EVENING)
-    night = _window(hours, NIGHT)
-    midday_sell = _avg_price(morning, "sell_price_amd")
-    peak_buy = _avg_price(evening, "buy_price_amd")
-    night_buy = _avg_price(night, "buy_price_amd")
-    morning_charge = sum(float(row["charge_kwh"]) for row in morning)
-    if mode == MODE_BASELINE:
-        morning_export = sum(float(row["baseline_export_kwh"]) for row in morning)
-    else:
-        morning_export = sum(float(row["pv_to_grid_kwh"]) + float(row["battery_to_grid_kwh"]) for row in morning)
-    evening_to_load = sum(float(row["battery_to_load_kwh"]) for row in evening)
-    evening_to_grid = sum(float(row["battery_to_grid_kwh"]) for row in evening)
-    night_charge = sum(float(row["charge_kwh"]) for row in night)
-    night_load = sum(float(row["load_kwh"]) for row in night)
-    soc_hint = max((float(row["soc_pct"]) for row in morning), default=0.0)
-    bess = '<span class="vs-term" title="BESS — батарея, которая переносит энергию из дешевого часа в дорогой">BESS</span>'
-    soc = '<span class="vs-term" title="SoC — уровень заряда батареи, доля от ее емкости">SoC</span>'
-    arb = '<span class="vs-term" title="Арбитраж — сохранить дешевую энергию и использовать или продать ее, когда тариф выше">арбитраж</span>'
+def _rows_for_block(hours: list[dict[str, Any]], block: dict[str, Any]) -> list[dict[str, Any]]:
+    start = int(block["start_hour"])
+    end = int(block["end_hour"])
+    return [row for row in hours if start <= int(row["hour"]) <= end]
 
-    if mode == MODE_BASELINE:
-        return [
-            {
-                "time": "Утро и полдень · 10:00–15:00",
-                "title": "☀️ Излишек уходит задешево",
-                "badge": "Нет зарядки",
-                "badge_class": "vs-pill-bad",
-                "text": (
-                    f"Солнце есть, батарея простаивает. {morning_export:.1f} кВт·ч в этом окне "
-                    f"ушли бы в сеть примерно по {midday_sell:.0f} AMD/кВт·ч."
-                ),
-            },
-            {
-                "time": "Вечерний пик · 18:00–22:00",
-                "title": "⚡ Покупка по пиковому тарифу",
-                "badge": "Переплата",
-                "badge_class": "vs-pill-bad",
-                "text": (
-                    f"Здание покупает вечернюю нагрузку у сети около {peak_buy:.0f} AMD/кВт·ч. "
-                    "Сгладить пик нечем."
-                ),
-            },
-            {
-                "time": "Ночь · 23:00–07:00",
-                "title": "🌙 Дешевый час не используется",
-                "badge": "Простой",
-                "badge_class": "vs-pill-amber",
-                "text": (
-                    f"Ночная энергия стоит около {night_buy:.0f} AMD/кВт·ч, нагрузка {night_load:.1f} кВт·ч. "
-                    "Запас на утро не создается."
-                ),
-            },
-        ]
-    dr = mode == MODE_DR
-    evening_title = "⚡ USE и SELL под команду сети" if dr else "⚡ USE и SELL"
-    evening_text = (
-        f"Пиковый тариф около {peak_buy:.0f} AMD/кВт·ч. Батарея отдает зданию {evening_to_load:.1f} кВт·ч "
-        f"и продает в сеть {evening_to_grid:.1f} кВт·ч."
-    )
-    if dr:
-        evening_text += " Оператор срезал 40% нагрузки в 18:00–21:00, остаток закрывает накопитель."
+
+def _block_badge(decision: str, rows: list[dict[str, Any]]) -> str:
+    if decision == "store":
+        return f"{sum(float(row['charge_kwh']) for row in rows):.1f} кВт·ч"
+    if decision == "sell":
+        sold = sum(float(row["pv_to_grid_kwh"]) + float(row["battery_to_grid_kwh"]) for row in rows)
+        return f"{sold:.1f} кВт·ч в сеть"
+    if decision == "use":
+        return f"{sum(float(row['battery_to_load_kwh']) for row in rows):.1f} кВт·ч зданию"
+    return "без цикла"
+
+
+def _block_sentence(decision: str, rows: list[dict[str, Any]]) -> str:
+    charge = sum(float(row["charge_kwh"]) for row in rows)
+    pv_battery = sum(float(row["pv_to_battery_kwh"]) for row in rows)
+    grid_battery = sum(float(row["grid_to_battery_kwh"]) for row in rows)
+    battery_load = sum(float(row["battery_to_load_kwh"]) for row in rows)
+    battery_grid = sum(float(row["battery_to_grid_kwh"]) for row in rows)
+    pv_grid = sum(float(row["pv_to_grid_kwh"]) for row in rows)
+    pv_load = sum(float(row["pv_to_load_kwh"]) for row in rows)
+    grid_load = sum(float(row["grid_to_load_kwh"]) for row in rows)
+    if decision == "store":
+        if pv_battery < 0.05:
+            return f"В батарею уходит {charge:.1f} кВт·ч из сети."
+        if grid_battery < 0.05:
+            return f"В батарею уходит {charge:.1f} кВт·ч от солнца."
+        return (
+            f"В батарею уходит {charge:.1f} кВт·ч: {pv_battery:.1f} от солнца и "
+            f"{grid_battery:.1f} из сети."
+        )
+    if decision == "sell":
+        sold = battery_grid + pv_grid
+        if battery_grid < 0.05:
+            return f"В сеть уходит {sold:.1f} кВт·ч напрямую от солнца."
+        if pv_grid < 0.05:
+            return f"В сеть уходит {sold:.1f} кВт·ч из батареи."
+        return (
+            f"В сеть уходит {sold:.1f} кВт·ч: {battery_grid:.1f} из батареи и "
+            f"{pv_grid:.1f} напрямую от солнца."
+        )
+    if decision == "use":
+        if battery_load >= 0.05:
+            return (
+                f"Здание получает {battery_load:.1f} кВт·ч из батареи. "
+                f"Живое солнце закрывает еще {pv_load:.1f} кВт·ч."
+            )
+        return f"Живое солнце закрывает {pv_load:.1f} кВт·ч. Батарея в этом окне не разряжается."
+    return f"Батарея стоит. Здание покупает {grid_load:.1f} кВт·ч."
+
+
+def _bridge_amounts(comparison: dict[str, Any], delta: int) -> list[tuple[str, int]]:
+    """Signed contributions that add up to the two rounded bills."""
+    amounts = [
+        int(round(float(comparison["import_delta_amd"]))),
+        int(round(float(comparison["export_delta_amd"]))),
+        -int(round(float(comparison["wear_delta_amd"]))),
+    ]
+    amounts[-1] += delta - sum(amounts)
     return [
-        {
-            "time": "Утро и полдень · 10:00–15:00",
-            "title": "☀️ STORE",
-            "badge": "Зарядка батареи",
-            "badge_class": "vs-pill-amber",
-            "text": (
-                f"Солнце на пике. В {bess} уходит {morning_charge:.1f} кВт·ч вместо продажи всего излишка "
-                f"по {midday_sell:.0f} AMD. Прямой сброс в этом окне: {morning_export:.1f} кВт·ч. "
-                f"{soc} в окне доходит до {soc_hint:.0f}%."
-            ),
-        },
-        {
-            "time": "Вечерний пик сети · 18:00–22:00",
-            "title": evening_title,
-            "badge": "Максимальная выгода",
-            "badge_class": "vs-pill-good",
-            "text": evening_text,
-        },
-        {
-            "time": "Ночь · 23:00–07:00",
-            "title": "🌙 STANDBY / дешевый заряд",
-            "badge": "Эко-режим",
-            "badge_class": "vs-pill-good",
-            "text": (
-                f"Нагрузка {night_load:.1f} кВт·ч. Ночная энергия около {night_buy:.0f} AMD. "
-                f"Батарея берет ее только под {arb}: {night_charge:.1f} кВт·ч."
-            ),
-        },
+        ("Покупка у сети", amounts[0]),
+        ("Продажа в сеть", amounts[1]),
+        ("Износ батареи", amounts[2]),
     ]
 
 
-def chart_balance(hours: list[dict[str, Any]], managed: bool, demand_response: bool) -> go.Figure:
+def chart_balance(
+    hours: list[dict[str, Any]],
+    self_hours: list[dict[str, Any]],
+    demand_response: bool,
+) -> go.Figure:
     labels = [row["label"] for row in hours]
-    charge = [float(row["charge_kwh"]) if managed else 0.0 for row in hours]
-    discharge = [float(row["discharge_kwh"]) if managed else 0.0 for row in hours]
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=[0.66, 0.34],
+        vertical_spacing=0.08,
+        specs=[[{"secondary_y": False}], [{"secondary_y": True}]],
+    )
     fig.add_trace(
         go.Scatter(
             x=labels,
             y=[row["solar_kwh"] for row in hours],
             name="Солнечная выработка",
             mode="lines",
-            line={"color": GOLD, "width": 2.4},
+            line={"color": GOLD, "width": 2.2},
             fill="tozeroy",
-            fillcolor="rgba(251, 191, 36, 0.18)",
+            fillcolor="rgba(251, 191, 36, 0.16)",
         ),
-        secondary_y=False,
+        row=1,
+        col=1,
     )
     fig.add_trace(
         go.Scatter(
@@ -324,119 +257,163 @@ def chart_balance(hours: list[dict[str, Any]], managed: bool, demand_response: b
             y=[row["load_kwh"] for row in hours],
             name="Нагрузка здания",
             mode="lines",
-            line={"color": PURPLE, "width": 2.6},
+            line={"color": PURPLE, "width": 2.4},
         ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Bar(
+            x=labels,
+            y=[row["charge_kwh"] for row in hours],
+            name="Зарядка",
+            marker_color=EMERALD,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Bar(
+            x=labels,
+            y=[-float(row["discharge_kwh"]) for row in hours],
+            name="Разрядка",
+            marker_color=RED,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=labels,
+            y=[row["soc_pct"] for row in hours],
+            name="Заряд плана",
+            mode="lines",
+            line={"color": EMERALD, "width": 2.4},
+        ),
+        row=2,
+        col=1,
         secondary_y=False,
     )
     fig.add_trace(
-        go.Bar(x=labels, y=charge, name="Зарядка накопителя", marker_color=EMERALD),
-        secondary_y=False,
-    )
-    fig.add_trace(
-        go.Bar(x=labels, y=[-value for value in discharge], name="Разрядка", marker_color=RED),
+        go.Scatter(
+            x=labels,
+            y=[row["soc_pct"] for row in self_hours],
+            name="Заряд самопотребления",
+            mode="lines",
+            line={"color": SLATE, "width": 2.0, "dash": "dash"},
+        ),
+        row=2,
+        col=1,
         secondary_y=False,
     )
     fig.add_trace(
         go.Scatter(
             x=labels,
             y=[row["buy_price_amd"] for row in hours],
-            name="Тариф сети",
+            name="Тариф покупки",
             mode="lines",
-            line={"color": BLUE, "width": 2.2, "dash": "dot"},
+            line={"color": BLUE, "width": 2.0, "dash": "dot"},
         ),
+        row=2,
+        col=1,
         secondary_y=True,
     )
     if demand_response:
         fig.add_vrect(
             x0="18:00",
-            x1="20:00",
+            x1="21:00",
             fillcolor="rgba(59, 130, 246, 0.12)",
             line_width=0,
-            annotation_text="Команда сети −40%",
+            annotation_text="Нагрузка −40%",
+            annotation_position="top left",
             annotation_font_color="#bfdbfe",
+            row=1,
+            col=1,
         )
     fig.update_layout(
         template="plotly_dark",
         barmode="relative",
-        height=460,
+        height=560,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="#131722",
         font={"color": "#e2e8f0", "family": "Segoe UI, sans-serif"},
-        legend={"orientation": "h", "y": 1.12, "x": 0},
+        legend={"orientation": "h", "y": 1.14, "x": 0},
         margin={"l": 56, "r": 56, "t": 48, "b": 40},
         hovermode="x unified",
     )
-    fig.update_yaxes(title_text="кВт·ч за час", secondary_y=False, gridcolor="rgba(255,255,255,0.06)")
-    fig.update_yaxes(title_text="Тариф, AMD/кВт·ч", secondary_y=True, gridcolor="rgba(255,255,255,0.04)")
+    fig.update_yaxes(title_text="кВт·ч за час", row=1, col=1, gridcolor="rgba(255,255,255,0.06)")
+    fig.update_yaxes(
+        title_text="Заряд, %",
+        range=[0, 100],
+        row=2,
+        col=1,
+        secondary_y=False,
+        gridcolor="rgba(255,255,255,0.06)",
+    )
+    fig.update_yaxes(
+        title_text="Тариф, AMD/кВт·ч",
+        row=2,
+        col=1,
+        secondary_y=True,
+        gridcolor="rgba(255,255,255,0.04)",
+    )
     fig.update_xaxes(gridcolor="rgba(255,255,255,0.04)")
     return fig
 
 
-def _row_mode(row: dict[str, Any], managed: bool) -> str:
-    if not managed:
-        if float(row["baseline_export_kwh"]) > float(row["baseline_import_kwh"]):
-            return "SELL"
-        return "USE"
-    decision = str(row["decision"])
-    if decision == "idle":
-        return "STANDBY"
-    return decision.upper()
-
-
-def _row_volume(row: dict[str, Any], managed: bool) -> float:
-    if not managed:
-        return max(float(row["baseline_export_kwh"]), float(row["baseline_import_kwh"]))
-    decision = row["decision"]
-    if decision == "store":
-        return float(row["charge_kwh"])
-    if decision == "sell":
-        return float(row["pv_to_grid_kwh"]) + float(row["battery_to_grid_kwh"])
-    if decision == "use":
-        return float(row["battery_to_load_kwh"]) + float(row["pv_to_load_kwh"])
-    return float(row["grid_to_load_kwh"])
-
-
-def _row_tariff(row: dict[str, Any], mode_name: str) -> float:
-    if mode_name == "SELL":
-        return float(row["sell_price_amd"])
-    return float(row["buy_price_amd"])
-
-
-def billing_frame(hours: list[dict[str, Any]], managed: bool) -> pd.DataFrame:
-    rows = []
-    for row in hours:
-        mode_name = _row_mode(row, managed)
-        total = float(row["net_cost_amd"] if managed else row["baseline_net_cost_amd"])
+def billing_frame(plan: dict[str, Any]) -> pd.DataFrame:
+    wear_rate = float(plan["battery"]["degradation_amd_per_kwh"])
+    rows: list[dict[str, Any]] = []
+    for row in plan["hours"]:
+        charge = float(row["charge_kwh"])
+        discharge = float(row["discharge_kwh"])
+        purchase = (float(row["grid_to_load_kwh"]) + float(row["grid_to_battery_kwh"])) * float(row["buy_price_amd"])
+        sale = (float(row["pv_to_grid_kwh"]) + float(row["battery_to_grid_kwh"])) * float(row["sell_price_amd"])
+        wear = wear_rate * (charge + discharge)
         rows.append(
             {
                 "Час": row["label"],
-                "Режим (STORE / USE / SELL)": mode_name,
-                "Объем (кВт·ч)": round(_row_volume(row, managed), 2),
-                "Тариф (AMD)": round(_row_tariff(row, mode_name), 0),
-                "Итог (AMD)": round(total, 0),
+                "Решение": DECISION_RU.get(str(row["decision"]), str(row["decision"])),
+                "Заряд батареи, %": float(row["soc_pct"]),
+                "Заряд, кВт·ч": charge,
+                "В здание, кВт·ч": float(row["battery_to_load_kwh"]),
+                "В сеть, кВт·ч": float(row["pv_to_grid_kwh"]) + float(row["battery_to_grid_kwh"]),
+                "Покупка, AMD": purchase,
+                "Продажа, AMD": sale,
+                "Износ, AMD": wear,
+                "Итог, AMD": purchase - sale + wear,
             }
         )
-    return pd.DataFrame(rows)
+    frame = pd.DataFrame(rows)
+    totals = {"Час": "Сутки", "Решение": ""}
+    for column in frame.columns:
+        if column in {"Час", "Решение"}:
+            continue
+        if column == "Заряд батареи, %":
+            totals[column] = float("nan")
+            continue
+        totals[column] = float(frame[column].sum())
+    return pd.concat([frame, pd.DataFrame([totals])], ignore_index=True)
 
 
 def paint_billing(frame: pd.DataFrame) -> pd.io.formats.style.Styler:
     colors = {
-        "STORE": "background-color: #3f2e12; color: #fde68a",
-        "USE": "background-color: #172554; color: #dbeafe",
-        "SELL": "background-color: #064e3b; color: #d1fae5",
-        "STANDBY": "background-color: #1e293b; color: #e2e8f0",
+        "Сохранить": "background-color: #3f2e12; color: #fde68a",
+        "Потребить": "background-color: #172554; color: #dbeafe",
+        "Продать": "background-color: #064e3b; color: #d1fae5",
+        "Пауза": "background-color: #1e293b; color: #e2e8f0",
     }
-    column = "Режим (STORE / USE / SELL)"
 
     def _cell(value: str) -> str:
         return colors.get(value, "")
 
-    return frame.style.map(_cell, subset=[column]).format(
-        {
-            "Объем (кВт·ч)": "{:.2f}",
-            "Тариф (AMD)": "{:.0f}",
-            "Итог (AMD)": "{:,.0f}",
-        }
+    money = ["Покупка, AMD", "Продажа, AMD", "Износ, AMD", "Итог, AMD"]
+    energy = ["Заряд, кВт·ч", "В здание, кВт·ч", "В сеть, кВт·ч"]
+    return (
+        frame.style.map(_cell, subset=["Решение"])
+        .format({column: "{:,.0f}" for column in money}, na_rep="—")
+        .format({column: "{:.2f}" for column in energy}, na_rep="—")
+        .format({"Заряд батареи, %": "{:.0f}"}, na_rep="—")
     )
 
 
@@ -460,10 +437,10 @@ def apply_preset(preset: dict[str, Any]) -> None:
     st.session_state.degradation_amd_per_kwh = float(battery["degradation_amd_per_kwh"])
 
 
-def payload_from_state(scenario_id: str, mode: str) -> dict[str, Any]:
+def payload_from_state(scenario_id: str) -> dict[str, Any]:
     return {
         "scenario": scenario_id,
-        "demand_response_active": mode == MODE_DR,
+        "demand_response_active": bool(st.session_state.demand_response),
         "peak_shaving_active": False,
         "site": {
             "name": "Yerevan prosumer site",
@@ -489,62 +466,6 @@ def payload_from_state(scenario_id: str, mode: str) -> dict[str, Any]:
     }
 
 
-def render_sidebar(catalog: dict[str, Any]) -> str:
-    st.sidebar.markdown("### Объект")
-    st.sidebar.caption("Параметры дня. Основной экран от них не зависит по структуре.")
-    presets = catalog["scenarios"]
-    labels = {item["id"]: item["title"] for item in presets}
-    scenario_id = st.sidebar.selectbox(
-        "День",
-        options=[item["id"] for item in presets],
-        format_func=lambda item: labels[item],
-        key="scenario_id",
-        on_change=_on_scenario_change,
-        kwargs={"presets": presets},
-        help="Готовый сутки Еревана: солнце, нагрузка здания и тариф.",
-    )
-    selected = next(item for item in presets if item["id"] == scenario_id)
-    st.sidebar.caption(selected["description"])
-    tariff_labels = {item["id"]: item["title"] for item in catalog["tariff_profiles"]}
-    st.sidebar.selectbox(
-        "Тариф",
-        options=list(tariff_labels),
-        format_func=lambda item: tariff_labels[item],
-        key="tariff_profile",
-        help="Книга цен в AMD. Вечерний тариф выше дневного и ночного.",
-    )
-    st.sidebar.slider("Мощность СЭС, кВт·пик", 0.0, 40.0, step=0.5, key="pv_capacity_kwp")
-    st.sidebar.slider("Нагрузка за сутки, кВт·ч", 0.0, 120.0, step=1.0, key="daily_load_kwh")
-    st.sidebar.slider("Облачность", 0.0, 1.0, step=0.01, key="cloud_cover")
-    st.sidebar.slider(
-        "Емкость батареи, кВт·ч",
-        0.0,
-        80.0,
-        step=0.5,
-        key="capacity_kwh",
-        help="BESS — накопитель. Емкость задает, сколько энергии можно перенести на вечер.",
-    )
-    st.sidebar.slider("Мощность инвертора, кВт", 0.0, 40.0, step=0.5, key="power_kw")
-    with st.sidebar.expander("Точнее"):
-        st.slider(
-            "Начальный заряд",
-            0.0,
-            1.0,
-            step=0.01,
-            key="soc_initial",
-            help="SoC — доля заполнения батареи на начало суток.",
-        )
-        st.slider("Минимальный заряд", 0.0, 0.5, step=0.01, key="soc_min")
-        st.slider("Максимальный заряд", 0.5, 1.0, step=0.01, key="soc_max")
-        st.slider("Износ, AMD за кВт·ч", 0.0, 20.0, step=0.5, key="degradation_amd_per_kwh")
-        st.number_input("Зерно погоды", min_value=0, max_value=10_000_000, step=1, key="seed")
-        st.slider("КПД заряда", 0.70, 1.0, step=0.01, key="charge_efficiency")
-        st.slider("КПД разряда", 0.70, 1.0, step=0.01, key="discharge_efficiency")
-        st.slider("Восход", 4.0, 9.0, step=0.1, key="sunrise_hour")
-        st.slider("Закат", 16.0, 22.0, step=0.1, key="sunset_hour")
-    return scenario_id
-
-
 def _on_scenario_change(presets: list[dict[str, Any]]) -> None:
     selected = next(item for item in presets if item["id"] == st.session_state.scenario_id)
     apply_preset(selected)
@@ -561,172 +482,303 @@ def ensure_catalog(base_url: str) -> dict[str, Any]:
     return st.session_state.catalog
 
 
-def render_hero(mode: str) -> None:
-    if mode == MODE_BASELINE:
-        badge = '<div class="vs-badge vs-badge-off">Алгоритм выключен | Объект покупает сеть как получится</div>'
-    else:
-        badge = '<div class="vs-badge vs-badge-live">🟢 Алгоритм активен | Оптовый рынок AEX подключен</div>'
+def render_header(title: str) -> None:
     st.markdown(
         f"""
-        <div class="vs-top">
-          <div>
-            <h1 class="vs-logo">VoltSync VPP</h1>
-            <p class="vs-sub">Интеллектуальный энергомозг: Store, Use or Sell</p>
-          </div>
-          {badge}
+        <p class="vs-kicker">Синтетический день · демонстрационный тариф</p>
+        <h1 class="vs-logo">VoltSync</h1>
+        <p class="vs-sub">Диспетчер одной батареи на сутки: сохранить, потребить или продать.</p>
+        <p class="vs-meta">{html.escape(title)}. Это не тариф ЭСА и не подключенный рынок.</p>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_controls(catalog: dict[str, Any]) -> str:
+    presets = catalog["scenarios"]
+    day, solar, battery = st.columns([1.3, 1, 1])
+    with day:
+        scenario_id = st.selectbox(
+            "День",
+            options=[item["id"] for item in presets],
+            format_func=lambda item: _scenario_copy(item, item, "")[0],
+            key="scenario_id",
+            on_change=_on_scenario_change,
+            kwargs={"presets": presets},
+        )
+    with solar:
+        st.slider("Мощность СЭС, кВт", 0.0, 40.0, step=0.5, key="pv_capacity_kwp")
+    with battery:
+        st.slider(
+            "Емкость батареи, кВт·ч",
+            0.0,
+            80.0,
+            step=0.5,
+            key="capacity_kwh",
+            help="Сколько энергии можно перенести на другой час.",
+        )
+    selected = next(item for item in presets if item["id"] == scenario_id)
+    _title, description = _scenario_copy(scenario_id, selected["title"], selected["description"])
+    st.caption(description)
+    with st.expander("Точнее"):
+        tariff_labels = {item["id"]: TARIFF_RU.get(item["id"], item["title"]) for item in catalog["tariff_profiles"]}
+        st.selectbox(
+            "Тариф",
+            options=list(tariff_labels),
+            format_func=lambda item: tariff_labels[item],
+            key="tariff_profile",
+            help="Демонстрационная книга цен в драмах. Вечерний тариф выше дневного и ночного.",
+        )
+        st.slider("Нагрузка за сутки, кВт·ч", 0.0, 120.0, step=1.0, key="daily_load_kwh")
+        st.slider("Облачность", 0.0, 1.0, step=0.01, key="cloud_cover")
+        st.slider("Мощность инвертора, кВт", 0.0, 40.0, step=0.5, key="power_kw")
+        st.slider("Начальный заряд", 0.0, 1.0, step=0.01, key="soc_initial", help="Доля емкости на начало суток.")
+        st.slider("Минимальный заряд", 0.0, 0.5, step=0.01, key="soc_min")
+        st.slider("Максимальный заряд", 0.5, 1.0, step=0.01, key="soc_max")
+        st.slider("Износ, AMD за кВт·ч", 0.0, 20.0, step=0.5, key="degradation_amd_per_kwh")
+        st.slider("КПД заряда", 0.70, 1.0, step=0.01, key="charge_efficiency")
+        st.slider("КПД разряда", 0.70, 1.0, step=0.01, key="discharge_efficiency")
+        st.slider("Восход", 4.0, 9.0, step=0.1, key="sunrise_hour")
+        st.slider("Закат", 16.0, 22.0, step=0.1, key="sunset_hour")
+        st.number_input("Зерно погоды", min_value=0, max_value=10_000_000, step=1, key="seed")
+    st.checkbox(
+        "Команда сети: снизить нагрузку на 40% с 18:00 до 21:00",
+        key="demand_response",
+        help="Плата за снижение показана отдельно и не входит в экономию диспетчера.",
+    )
+    return scenario_id
+
+
+def render_command(plan: dict[str, Any]) -> None:
+    hours = plan["hours"]
+    active = [block for block in plan["blocks"] if block["decision"] != "idle"]
+    soc_at_peak = float(hours[17]["soc_pct"]) if len(hours) > 17 else 0.0
+    if active:
+        first = active[0]
+        rows = _rows_for_block(hours, first)
+        window = str(first["label"]).replace("-", "–")
+        title = f"{window} · {DECISION_RU.get(first['decision'], first['decision'])}"
+        text = _block_sentence(first["decision"], rows)
+    else:
+        title = "Батарея не диспетчируется"
+        text = "Цены этих суток не окупают цикл."
+    st.markdown(
+        f"""
+        <div class="vs-card">
+          <div class="vs-label">Первое действие плана</div>
+          <div class="vs-value">{html.escape(title)}</div>
+          <p>{html.escape(text)} К 18:00 заряд батареи {soc_at_peak:.0f}%.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+    if not active:
+        return
+    rows_of_blocks = [active[index : index + 3] for index in range(0, len(active), 3)]
+    for group in rows_of_blocks:
+        columns = st.columns(3)
+        for column, block in zip(columns, group):
+            rows = _rows_for_block(hours, block)
+            decision = str(block["decision"])
+            pill = {
+                "store": "vs-pill-amber",
+                "use": "vs-pill-blue",
+                "sell": "vs-pill-good",
+            }.get(decision, "vs-pill-amber")
+            column.markdown(
+                f"""
+                <div class="vs-stage">
+                  <div class="vs-label">{html.escape(str(block["label"]).replace("-", "–"))}</div>
+                  <h3>{html.escape(DECISION_RU.get(decision, decision))}</h3>
+                  <span class="vs-pill {pill}">{html.escape(_block_badge(decision, rows))}</span>
+                  <p style="margin-top:12px">{html.escape(_block_sentence(decision, rows))}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+
+def render_money(plan: dict[str, Any]) -> None:
+    comparison = plan["comparison"]
+    self_bill = int(round(float(comparison["self_consumption"]["net_cost_amd"])))
+    optimal_bill = int(round(float(comparison["optimized"]["net_cost_amd"])))
+    no_battery = int(round(float(comparison["no_battery"]["net_cost_amd"])))
+    delta = self_bill - optimal_bill
+    battery_gap = no_battery - self_bill
+    pill = "vs-pill-good" if delta > 0 else "vs-pill-amber" if delta == 0 else "vs-pill-bad"
+    pill_text = (
+        "дешевле самопотребления"
+        if delta > 0
+        else "тот же счет"
+        if delta == 0
+        else "дороже самопотребления"
+    )
+    left, middle, right = st.columns(3)
+    left.markdown(
+        f"""
+        <div class="vs-card">
+          <div class="vs-label">Самопотребление</div>
+          <div class="vs-value">{html.escape(_amd(self_bill))}</div>
+          <p>Та же батарея забирает только лишнее солнце и отдает его зданию.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    middle.markdown(
+        f"""
+        <div class="vs-card">
+          <div class="vs-label">Разница плана</div>
+          <div class="vs-value">{html.escape(_signed_amd(delta))}</div>
+          <span class="vs-pill {pill}">{html.escape(pill_text)}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    right.markdown(
+        f"""
+        <div class="vs-card">
+          <div class="vs-label">Оптимальный план</div>
+          <div class="vs-value">{html.escape(_amd(optimal_bill))}</div>
+          <p>Заряд и разряд идут в часы с лучшей ценой. Износ уже в сумме.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    bridge = _bridge_amounts(comparison, delta)
+    bridge_rows = "".join(
+        f"<tr><td>{html.escape(label)}</td><td>{html.escape(_signed_amd(amount))}</td></tr>"
+        for label, amount in bridge
+    )
+    bridge_rows += f"<tr><td>Итого к самопотреблению</td><td>{html.escape(_signed_amd(delta))}</td></tr>"
+    import_delta = float(comparison["dispatch_import_kwh_delta"])
+    co2 = float(comparison["dispatch_co2_delta_kg"])
+    if import_delta > 0.05:
+        carbon = (
+            f"Относительно самопотребления план берет из сети больше на {import_delta:.1f} кВт·ч, "
+            f"около {co2:.1f} кг CO2. Ночная зарядка дешевле, но не чище."
+        )
+    elif import_delta < -0.05:
+        carbon = (
+            f"Относительно самопотребления план берет из сети меньше на {abs(import_delta):.1f} кВт·ч, "
+            f"около {abs(co2):.1f} кг CO2."
+        )
+    else:
+        carbon = "Импорт из сети почти не меняется относительно самопотребления."
+    carbon += " Коэффициент 0,21 кг/кВт·ч — иллюстрация для энергосистемы Армении, не паспорт объекта."
+    st.markdown(
+        f"""
+        <div class="vs-card" style="margin-top:14px">
+          <div class="vs-label">Из чего сложилась разница. Плюс значит, что план выгоднее.</div>
+          <table class="vs-bridge">{bridge_rows}</table>
+          <p class="vs-note" style="margin-top:12px">
+            {html.escape(_gap_sentence(battery_gap, "Самопотребление", "объект без батареи"))}
+            Емкость накопителя и перенос по часам здесь разделены.
+            {html.escape("Отрицательный счет значит, что сутки принесли деньги." if self_bill < 0 or optimal_bill < 0 else "")}
+            {html.escape(carbon)}
+          </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def render_kpis(story: dict[str, float], mode: str) -> None:
-    managed = mode != MODE_BASELINE
-    if not managed:
-        savings_value = "0%"
-    elif abs(story["savings_pct"]) < 0.05:
-        savings_value = _amd(story["savings_amd"])
-    else:
-        savings_value = f"{story['savings_pct']:+.1f}%"
-    cards = [
-        (
-            "Итоговая экономия",
-            savings_value,
-            "переплата за день" if not managed else "выгода к счету без системы",
-            _amd(story["bill_without"] if not managed else story["savings_amd"]),
-            "vs-pill-bad" if not managed else "vs-pill-good",
-        ),
-        (
-            "Сэкономлено на пиковом тарифе" if managed else "Оплачено по пиковому тарифу",
-            _amd(story["peak_amd"]),
-            "вечернее окно 18:00–22:00",
-            "батарея закрыла дорогие часы" if managed else "покупка пика напрямую у сети",
-            "vs-pill-good" if managed else "vs-pill-bad",
-        ),
-        (
-            "Заработано на продаже излишков",
-            _amd(story["sales_amd"]),
-            "энергия, отданная в сеть",
-            "продажа в выгодный час" if managed else "сброс по низкой цене",
-            "vs-pill-good" if managed else "vs-pill-amber",
-        ),
-        (
-            "Спасено чистой энергии",
-            f"{story['saved_kwh']:.1f} кВт·ч",
-            "солнце, принятое батареей",
-            "иначе ушло бы за гроши" if managed else "без системы этот объем не сохраняется",
-            "vs-pill-good" if managed else "vs-pill-bad",
-        ),
-    ]
-    columns = st.columns(4)
-    for column, (label, value, note, pill, pill_class) in zip(columns, cards, strict=True):
-        column.markdown(
-            f"""
-            <div class="vs-kpi">
-              <div class="vs-kpi-label">{html.escape(label)}</div>
-              <div class="vs-kpi-value">{html.escape(value)}</div>
-              <div class="vs-note">{html.escape(note)}</div>
-              <div style="margin-top:10px"><span class="vs-pill {pill_class}">{html.escape(pill)}</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-
-def render_stages(plan: dict[str, Any], mode: str) -> None:
-    st.markdown("### Что делать с энергией в течение дня")
-    columns = st.columns(3)
-    for column, stage in zip(columns, _stage_copy(plan, mode), strict=True):
-        column.markdown(
-            f"""
-            <div class="vs-stage">
-              <div class="vs-stage-time">{html.escape(stage["time"])}</div>
-              <h3>{html.escape(stage["title"])}</h3>
-              <span class="vs-pill {stage["badge_class"]}">{html.escape(stage["badge"])}</span>
-              <p style="margin-top:12px">{stage["text"]}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-
-def render_details(plan: dict[str, Any], mode: str, story: dict[str, float]) -> None:
-    managed = mode != MODE_BASELINE
-    balance_tab, billing_tab = st.tabs(
-        ["📊 Энергетический баланс (24H)", "💰 Прозрачный биллинг и транзакции"]
+def render_demand_response(plan: dict[str, Any]) -> None:
+    if not plan.get("demand_response_active"):
+        return
+    curtailed = float(plan["demand_response_curtailed_kwh"])
+    compensation = float(plan["demand_response_compensation_amd"])
+    st.markdown(
+        f"""
+        <div class="vs-card" style="margin-top:14px">
+          <div class="vs-label">Команда сети, 18:00–21:00</div>
+          <p style="margin-top:8px">
+            Нагрузка снижена на 40%, это {curtailed:.1f} кВт·ч.
+            Демонстрационная плата за снижение: {html.escape(_amd(compensation))},
+            по тарифу покупки этих часов. Оба счета на экране уже посчитаны на этой сниженной нагрузке.
+            Плата в них не входит.
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
+
+
+def render_details(plan: dict[str, Any]) -> None:
+    balance_tab, billing_tab = st.tabs(["Энергетический баланс", "Почасовой счет"])
     with balance_tab:
         st.caption(
-            "Золото — солнце. Фиолетовая линия — нагрузка здания. "
-            "Зеленые столбцы — зарядка. Красные — разрядка на здание и в сеть. "
-            "Синяя линия справа — тариф, он совпадает с разрядкой в пике."
+            "Сверху солнце, нагрузка, заряд и разряд оптимального плана. "
+            "Снизу заряд батареи: сплошная линия — план, пунктир — самопотребление. "
+            "Точки — тариф покупки. Модель линейная: КПД, мощность инвертора и износ уже в счете."
         )
         st.plotly_chart(
-            chart_balance(plan["hours"], managed, mode == MODE_DR),
+            chart_balance(plan["hours"], plan["self_consumption_hours"], bool(plan["demand_response_active"])),
             width="stretch",
             config={"displayModeBar": False},
         )
     with billing_tab:
-        without = story["bill_without"]
-        with_sync = story["bill_with"]
-        st.markdown(
-            f"""
-            <div class="vs-bills">
-              <div class="vs-bill">Без VoltSync<b>{html.escape(_amd(without))}</b></div>
-              <div class="vs-bill">С VoltSync<b>{html.escape(_amd(with_sync))}</b></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.caption("Отрицательный итог в таблице — час принес деньги. Положительный — час стоил денег.")
-        frame = billing_frame(plan["hours"], managed)
-        st.dataframe(paint_billing(frame), hide_index=True, width="stretch", height=480)
+        st.caption("Итог часа = покупка − продажа + износ. Отрицательный итог значит, что час принес деньги.")
+        frame = billing_frame(plan)
+        shown = paint_billing(frame)
+        st.dataframe(shown, hide_index=True, width="stretch", height=520)
+        table_total = float(frame.iloc[:-1]["Итог, AMD"].sum())
+        bill = float(plan["comparison"]["optimized"]["net_cost_amd"])
+        if abs(table_total - bill) >= 1:
+            st.caption(
+                f"Сумма строк {_amd(table_total)}. Счет сверху {_amd(bill)}. "
+                "Расхождение — округление каждого часа."
+            )
+
+
+def connection_box(health: dict[str, Any] | None) -> None:
+    with st.expander("Подключение"):
+        if health is not None:
+            solver = "солвер CBC доступен" if health.get("solver_available") else "солвер CBC не найден"
+            st.caption(f"{health.get('service')} {health.get('version')} · {solver}")
+        st.text_input("Адрес API", key="api_input")
 
 
 def main() -> None:
-    base_url = st.sidebar.text_input("API", value=DEFAULT_API_URL, key="api_input")
+    if "api_input" not in st.session_state:
+        st.session_state.api_input = DEFAULT_API_URL
+    if "demand_response" not in st.session_state:
+        st.session_state.demand_response = False
+    base_url = str(st.session_state.api_input)
     try:
         health = api_get(base_url, "/health")
     except ApiError as exc:
-        st.sidebar.error("API недоступен")
         st.error(str(exc))
         st.info("Запустите API из корня проекта: `uvicorn backend.main:app --reload --port 8000`")
+        connection_box(None)
         return
-
-    solver_state = "CBC готов" if health.get("solver_available") else "CBC не найден"
-    st.sidebar.caption(f"{health.get('service')} {health.get('version')} · {solver_state}")
 
     try:
         catalog = ensure_catalog(base_url)
-        scenario_id = render_sidebar(catalog)
     except ApiError as exc:
         st.error(str(exc))
+        connection_box(health)
         return
 
-    if "view_mode" not in st.session_state:
-        st.session_state.view_mode = MODE_AI
-    render_hero(st.session_state.view_mode)
-    mode = st.radio(
-        "Сценарий",
-        options=list(MODES),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="view_mode",
-        help="Арбитраж — сохранить энергию дешево и использовать или продать ее дорого. BESS — батарея. SoC — ее уровень заряда.",
-    )
-
+    presets = catalog["scenarios"]
+    selected = next(item for item in presets if item["id"] == st.session_state.get("scenario_id", presets[0]["id"]))
+    title, _description = _scenario_copy(selected["id"], selected["title"], selected["description"])
+    render_header(title)
+    scenario_id = render_controls(catalog)
     try:
-        plan = api_post(base_url, "/api/v1/plan", payload_from_state(scenario_id, mode))
+        plan = api_post(base_url, "/api/v1/plan", payload_from_state(scenario_id))
     except ApiError as exc:
         st.error(str(exc))
+        connection_box(health)
         return
 
-    story = _money_story(plan, mode != MODE_BASELINE)
-    render_kpis(story, mode)
-    st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
-    render_stages(plan, mode)
-    st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
-    render_details(plan, mode, story)
+    render_command(plan)
+    render_money(plan)
+    render_demand_response(plan)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    render_details(plan)
+    connection_box(health)
 
 
 main()
