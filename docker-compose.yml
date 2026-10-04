@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    image: voltsynch:latest
+    container_name: voltsynch
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoltSynch — ինչպես է աշխատում ծառայությունը</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700&family=Noto+Sans:wght@400;600&family=Noto+Serif+Armenian:wght@600&family=Noto+Serif:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=9">
+</head>
+<body class="present">
+  <header>
+    <a class="brand" href="/" style="text-decoration:none;color:inherit">
+      <div class="mark">VOLTSYNCH</div>
+      <div class="sub" data-i18n="sub">արևային էներգիայի բորսա</div>
+    </a>
+    <nav>
+      <a class="nav-link" href="/" data-i18n="nav">Մուտքեր</a>
+    </nav>
+    <div class="lang-switch" role="group" aria-label="Լեզու">
+      <button type="button" data-set-lang="hy" class="active">Հայ</button>
+      <button type="button" data-set-lang="en">EN</button>
+    </div>
+  </header>
+
+  <main class="essay">
+    <p class="kicker" data-i18n="kicker">Green Tech Academy · հաքաթոն</p>
+    <h1 data-i18n="title">Ցանցը արևային էներգիան գնում է միայն այն ժամին, երբ այն ցանցին անհրաժեշտ է</h1>
+    <p class="lead" data-i18n="lead">Կեսօրվա ավելցուկը ցանց չի մտնում։ Կայանը պահում է այն մարտկոցում և վաճառում հաջորդ ընդունման ժամին։ VoltSynch-ը կազմակերպում է վաճառքը և պահում է գնի 10%-ը։</p>
+
+    <div class="flow">
+      <span data-i18n="f1">Արտադրություն</span>
+      <span class="arrow">→</span>
+      <span data-i18n="f2">Մարտկոց, եթե ցանցը չի գնում</span>
+      <span class="arrow">→</span>
+      <span data-i18n="f3">Վաճառք ընդունման ժամին</span>
+    </div>
+
+    <section>
+      <h2 data-i18n="hProblem">Խնդիրը</h2>
+      <p data-i18n="pProblem1">Արևային կայանն ամենաշատն է արտադրում կեսօրին։ Հայաստանում էլեկտրաէներգիայի պահանջարկն ավելի բարձր է երեկոյան, իսկ ձմռանը՝ նաև առավոտյան։</p>
+      <p data-i18n="pProblem2">Եթե արտադրությունն անմիջապես գնա ցանց, էներգիան կհայտնվի այն ժամին, երբ այն պետք չէ, և չի լինի այն ժամին, երբ ցանցը ծանրաբեռնված է։</p>
+    </section>
+
+    <section>
+      <h2 data-i18n="hSolution">Լուծումը</h2>
+      <p data-i18n="pSolution">Ցանցը նախապես հայտարարում է, թե որ ժամերին է գնում։ Մնացած ժամերին կայանի ռելեն էներգիան ուղղում է մարտկոց։ Երբ ընդունումը բացվում է, վաճառքը կատարվում է նույն ժամին կամ մի քանի ժամվա ընթացքում։</p>
+    </section>
+
+    <section>
+      <h2 data-i18n="hSteps">Ինչպես է աշխատում</h2>
+      <ol class="steps">
+        <li data-i18n="s1">Կայանում կան վահանակ, մարտկոց և ռելե։ Ռելեն ընտրում է ուղղությունը՝ ցանց կամ մարտկոց։</li>
+        <li data-i18n="s2">Ցանցը գնում է ժամը, եթե պահանջարկը մոտ է այդ օրվա գագաթնակետին։ Շեմը՝ օրվա պիկի մոտ 80%-ը։ Դրանից ցածր գնում չկա։</li>
+        <li data-i18n="s3">Ընդունման ժամին կայանը վաճառում է արագ։ Միջինը՝ արտադրությունից 3,2 ժամ անց։ Մի մասը վաճառում է առաջին իսկ ժամին, մյուսները սպասում են ավելի բարձր գնի՝ առավելագույնը 12 ժամ։</li>
+        <li data-i18n="s4">Ցանցը վճարում է ընդունված յուրաքանչյուր կիլովատ-ժամի համար։ 90%-ը ստանում է կայանը, 10%-ը՝ VoltSynch-ը։</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2 data-i18n="hTariff">Գնման սակագին</h2>
+      <p data-i18n="pTariff">Գինը նշված է 1 կՎտ·ժ-ի համար. այդքան վճարում է ցանցը։ Սա ծառայության սցենարային գինն է։ Գործող սակագինը սահմանում է Հանրային ծառայությունները կարգավորող հանձնաժողովը, և այստեղ այն չի կիրառվում։</p>
+      <div class="roles">
+        <article>
+          <h3 data-i18n="t1h">Գնում չկա</h3>
+          <p class="tariff" data-i18n="t1v">0 դրամ</p>
+          <p data-i18n="t1p">Պահանջարկը հեռու է օրվա գագաթից։ Էներգիան մնում է մարտկոցում։ Եթե մարտկոցը լիքն է, ավելցուկը կտրվում է և ցանց չի մտնում։</p>
+        </article>
+        <article>
+          <h3 data-i18n="t2h">Սովորական ընդունում</h3>
+          <p class="tariff" data-i18n="t2v">մոտ 25 դրամ</p>
+          <p data-i18n="t2p">Ցանցն արդեն գնում է, բայց ժամը դեռ պիկը չէ։ Փաստացի գինը՝ 24–26 դրամ։ Միջնորդավճարից հետո կայանին մնում է մոտ 22,5 դրամ։</p>
+        </article>
+        <article>
+          <h3 data-i18n="t3h">Պիկային ընդունում</h3>
+          <p class="tariff" data-i18n="t3v">26–50 դրամ</p>
+          <p data-i18n="t3p">Որքան ժամը մոտ է օրվա առավելագույն պահանջարկին, այնքան գինը բարձր է։ Մեդիանը՝ մոտ 40 դրամ։ Կայանին մնում է մոտ 36 դրամ։</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="hRoles">Ով ինչ է տեսնում</h2>
+      <div class="roles">
+        <article>
+          <h3 data-i18n="r1h">Արևային կայան</h3>
+          <p data-i18n="r1p">Վաճառված ծավալը, եկամուտը միջնորդավճարից հետո և լրացուցիչ գումարը, որ ստացվել է մարտկոցի շնորհիվ։ Առանց մարտկոցի մերժված ժամերի էներգիան կորչում է։</p>
+        </article>
+        <article>
+          <h3 data-i18n="r2h">Էլեկտրացանց</h3>
+          <p data-i18n="r2p">Որքան էներգիա չի մտել ցանց, երբ այն պետք չէր, և որքան է եկել մարտկոցներից այն ժամերին, երբ ցանցը գնում էր։</p>
+        </article>
+        <article>
+          <h3 data-i18n="r3h">Բորսա</h3>
+          <p data-i18n="r3p">Միջնորդավճարը, բոլոր կայանների արդյունքը և արտադրության կանխատեսման ճշտությունը։</p>
+        </article>
+      </div>
+      <p><a href="/" data-i18n="open">Բացել կաբինետները</a></p>
+    </section>
+
+    <section>
+      <h2 data-i18n="hResults">Ինչ է ստացվել հաշվարկում</h2>
+      <p data-i18n="pResults">30 տնային կայան՝ Երևան, Շիրակ, Լոռի, Գեղարքունիք, Սյունիք։ Ժամանակահատվածը՝ 2024–2025։ Թվերը հաշվարկային են։ Տարվա սպառումը համընկնում է բաց տվյալի հետ՝ 7,90 ՏՎտ·ժ 2024 թվականին։</p>
+      <div class="stats">
+        <article class="stat">
+          <strong data-i18n="st1v">247 ՄՎտ·ժ</strong>
+          <span data-i18n="st1l">չի մտել ցանց այն ժամերին, երբ գնում չկար</span>
+        </article>
+        <article class="stat">
+          <strong data-i18n="st2v">12,8 մլն դրամ</strong>
+          <span data-i18n="st2l">ցանցը վճարել է ընդունված էներգիայի համար</span>
+        </article>
+        <article class="stat">
+          <strong data-i18n="st3v">1,28 մլն դրամ</strong>
+          <span data-i18n="st3l">VoltSynch-ի միջնորդավճարը՝ գնի ճիշտ 10%-ը</span>
+        </article>
+        <article class="stat">
+          <strong data-i18n="st4v">+5,2 մլն դրամ</strong>
+          <span data-i18n="st4l">կայանների լրացուցիչ եկամուտը մարտկոցի հաշվին</span>
+        </article>
+      </div>
+      <p data-i18n="pResults2">Գարնանը, ժամը 10:00–15:00, ցանցը չի գնում ժամերի 75%-ում։ Ձմեռային երեկոյան, ժամը 18:00–21:00, գնում է 80%-ում։ Վաճառքը տեղի է ունենում միջինը 3,2 ժամում։ Արտադրությունը՝ 1320–1630 կՎտ·ժ մեկ կիլովատ վահանակից տարում։ Եվս 93 ՄՎտ·ժ կտրվել է, որովհետև մարտկոցը լիքն էր, իսկ ցանցը չէր գնում։</p>
+    </section>
+
+    <section>
+      <h2 data-i18n="hMl">Մեքենայական ուսուցում</h2>
+      <p data-i18n="pMl1">Մոդելը գին չի դնում։ Գնման ժամերն ու սակագինը սահմանում է ցանցը։</p>
+      <p data-i18n="pMl2">Մոդելը կանխատեսում է, թե որքան կարտադրի կայանը մոտակա ժամերին։ Այդ կանխատեսումով ռելեն տեսնում է, արդյոք մարտկոցը կհասցնի լիցքավորվել մինչև վաճառքի ժամը։</p>
+      <p data-i18n="pMl3">Ուսուցումը՝ 2024 թվականի բոլոր ժամերը։ Ստուգումը՝ 2025-ը, որը մոդելը չի տեսել։ Լուսավոր ժամերին՝ 7:00–18:00, սխալը 0,074 կՎտ·ժ է։ Նույն ամսվա և նույն ժամի միջինը սխալվում է 0,205 կՎտ·ժ-ով։ Կաբինետում երևում են փաստացի արտադրությունը, կանխատեսումը և մարտկոցից ցանց եկած էներգիան։</p>
+    </section>
+
+    <section>
+      <h2 data-i18n="hReal">Ինչի վրա է հենված հաշվարկը</h2>
+      <p data-i18n="pReal">Օպերատորի ժամային չափումներ չկան, և դրանք հաշվարկում չեն օգտագործվել։ Տարվա ծավալը և ամիսների ձևը վերցված են բաց ամփոփագրերից։ Օրվա պրոֆիլը, հանգստյան օրերը և կայանները կառուցված են այդ ձևի վրա։ Սակագինը և գնման շեմը՝ օրվա պիկի մոտ 80%-ը, սցենար են։ Արևի դիրքը և տարեկան արտադրությունը մեկ կիլովատ վահանակից Հայաստանի համար իրատեսական միջակայքում են։</p>
+    </section>
+  </main>
+
+  <script>
+    const en = {
+      sub: "solar energy exchange",
+      nav: "Entrances",
+      kicker: "Green Tech Academy · hackathon",
+      title: "The grid buys solar energy only in the hour it needs it",
+      lead: "The midday surplus does not enter the grid. The station keeps it in a battery and sells it in the next buying hour. VoltSynch arranges the sale and keeps 10% of the price.",
+      f1: "Generation",
+      f2: "Battery, if the grid is not buying",
+      f3: "Sale in the buying hour",
+      hProblem: "The problem",
+      pProblem1: "A solar station produces the most at noon. In Armenia demand is higher in the evening, and in winter also in the morning.",
+      pProblem2: "If generation goes straight into the grid, the energy arrives in an hour when it is not needed, and is missing in the hour when the grid is loaded.",
+      hSolution: "The solution",
+      pSolution: "The grid publishes the hours in which it buys. In the other hours the station’s relay sends energy to the battery. When buying opens, the sale happens in that hour or within a few hours.",
+      hSteps: "How it works",
+      s1: "The station has a panel, a battery and a relay. The relay chooses the direction: the grid or the battery.",
+      s2: "The grid buys the hour if demand is close to that day’s peak. The threshold is about 80% of the daily peak. Below it, there is no purchase.",
+      s3: "In a buying hour the station sells quickly. On average, 3.2 hours after generation. Some sell in the first hour; others wait for a higher price, for 12 hours at most.",
+      s4: "The grid pays for every accepted kilowatt-hour. The station receives 90%, VoltSynch receives 10%.",
+      hTariff: "Purchase tariff",
+      pTariff: "The price is per 1 kWh: that is what the grid pays. This is the service’s scenario price. The public tariff is set by the Public Services Regulatory Commission, and it is not used here.",
+      t1h: "No purchase",
+      t1v: "0 dram",
+      t1p: "Demand is far from the day’s peak. Energy stays in the battery. If the battery is full, the surplus is curtailed and does not enter the grid.",
+      t2h: "Ordinary purchase",
+      t2v: "about 25 dram",
+      t2p: "The grid is already buying, but the hour is not yet the peak. The actual price is 24–26 dram. After the commission the station keeps about 22.5 dram.",
+      t3h: "Peak purchase",
+      t3v: "26–50 dram",
+      t3p: "The closer the hour is to the day’s highest demand, the higher the price. The median is about 40 dram. The station keeps about 36 dram.",
+      hRoles: "Who sees what",
+      r1h: "Solar station",
+      r1p: "Volume sold, income after the commission, and the extra amount earned because of the battery. Without a battery, energy in refused hours is lost.",
+      r2h: "Power grid",
+      r2p: "How much energy stayed out of the grid when it was not needed, and how much arrived from batteries in the hours the grid was buying.",
+      r3h: "Exchange",
+      r3p: "The commission, the result of every station, and the accuracy of the generation forecast.",
+      open: "Open the entrances",
+      hResults: "What the calculation shows",
+      pResults: "30 home stations: Yerevan, Shirak, Lori, Gegharkunik, Syunik. The period is 2024–2025. The figures are calculated. Annual consumption matches the public reference: 7.90 TWh in 2024.",
+      st1v: "247 MWh",
+      st1l: "stayed out of the grid in hours when there was no purchase",
+      st2v: "12.8 million dram",
+      st2l: "the grid paid for accepted energy",
+      st3v: "1.28 million dram",
+      st3l: "VoltSynch’s commission, exactly 10% of the price",
+      st4v: "+5.2 million dram",
+      st4l: "extra income of the stations from the batteries",
+      pResults2: "In spring, from 10:00 to 15:00, the grid does not buy in 75% of hours. On a winter evening, from 18:00 to 21:00, it buys in 80%. A sale happens in 3.2 hours on average. Yield is 1,320–1,630 kWh per kilowatt of panel per year. Another 93 MWh was curtailed: the battery was full and the grid was not buying.",
+      hMl: "Machine learning",
+      pMl1: "The model does not set the price. The grid sets the buying hours and the tariff.",
+      pMl2: "The model forecasts how much the station will produce in the coming hours. From that forecast the relay sees whether the battery will be charged in time for the sale.",
+      pMl3: "Training is every hour of 2024. The check is 2025, which the model had not seen. In daylight, from 7:00 to 18:00, the error is 0.074 kWh. The average of the same month and the same hour misses by 0.205 kWh. The entrance shows actual generation, the forecast, and the energy delivered from the battery to the grid.",
+      hReal: "What the calculation rests on",
+      pReal: "There are no hourly measurements from the operator, and they are not used. The annual volume and the monthly shape come from public summaries. The daily profile, weekends and stations are built on that shape. The tariff and the buying threshold — about 80% of the daily peak — are a scenario. The sun’s position and the yearly yield per kilowatt of panel sit in a range that is plausible for Armenia.",
+      doc: "VoltSynch — how the service works"
+    };
+
+    const hyDoc = document.title;
+    const hyText = {};
+    document.querySelectorAll("[data-i18n]").forEach((node) => {
+      hyText[node.dataset.i18n] = node.textContent;
+    });
+
+    function apply(lang) {
+      const pack = lang === "en" ? en : hyText;
+      document.documentElement.lang = lang === "en" ? "en" : "hy";
+      document.title = lang === "en" ? en.doc : hyDoc;
+      document.querySelectorAll("[data-i18n]").forEach((node) => {
+        const value = pack[node.dataset.i18n];
+        if (value) node.textContent = value;
+      });
+      document.querySelectorAll("[data-set-lang]").forEach((button) => {
+        const on = button.dataset.setLang === lang;
+        button.classList.toggle("active", on);
+        button.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      try { localStorage.setItem("voltsynch-lang", lang); } catch (e) {}
+    }
+
+    document.querySelectorAll("[data-set-lang]").forEach((button) => {
+      button.addEventListener("click", () => apply(button.dataset.setLang));
+    });
+
+    let saved = "hy";
+    try { saved = localStorage.getItem("voltsynch-lang") || "hy"; } catch (e) {}
+    if (saved === "ru") {
+      saved = "hy";
+      try { localStorage.setItem("voltsynch-lang", "hy"); } catch (e) {}
+    }
+    if (saved === "en") apply("en");
+  </script>
+</body>
+</html>
